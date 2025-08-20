@@ -1,7 +1,7 @@
 import std/[json, strutils]
-import chronos, results
+import chronos, results, ffi
 import libp2p/[protocols/ping, switch, multiaddress, multicodec]
-import ../../../waku/[factory/waku, waku_core/peers, node/waku_node], ../../alloc
+import ../../../waku/[factory/waku, waku_core/peers, node/waku_node]
 
 type PingRequest* = object
   peerAddr: cstring

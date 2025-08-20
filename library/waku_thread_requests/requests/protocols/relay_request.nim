@@ -1,5 +1,5 @@
 import std/[net, sequtils, strutils]
-import chronicles, chronos, stew/byteutils, results
+import chronicles, chronos, stew/byteutils, results, ffi
 import
   waku/waku_core/message/message,
   waku/factory/[validator_signed, waku],
@@ -13,7 +13,6 @@ import
   waku/node/peer_manager
   
 import
-  ../../../alloc
 
 type RelayMsgType* = enum
   SUBSCRIBE

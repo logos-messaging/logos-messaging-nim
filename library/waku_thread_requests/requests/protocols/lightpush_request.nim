@@ -1,5 +1,5 @@
 import options
-import chronicles, chronos, results
+import chronicles, chronos, results, ffi
 import
   ../../../../waku/waku_core/message/message,
   ../../../../waku/waku_core/codecs,
@@ -9,8 +9,7 @@ import
   ../../../../waku/waku_core/topics/pubsub_topic,
   ../../../../waku/waku_lightpush_legacy/client,
   ../../../../waku/waku_lightpush_legacy/common,
-  ../../../../waku/node/peer_manager/peer_manager,
-  ../../../alloc
+  ../../../../waku/node/peer_manager/peer_manager
 
 type LightpushMsgType* = enum
   PUBLISH

@@ -31,6 +31,7 @@ requires "nim >= 2.2.4",
   "results",
   "db_connector",
   "minilru"
+  "ffi"
 
 ### Helper functions
 proc buildModule(filePath, params = "", lang = "c"): bool =

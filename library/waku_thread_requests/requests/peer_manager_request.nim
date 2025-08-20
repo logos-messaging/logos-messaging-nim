@@ -1,9 +1,8 @@
 import std/[sequtils, strutils, tables]
-import chronicles, chronos, results, options, json
+import chronicles, chronos, results, options, json, ffi
 import
   ../../../waku/factory/waku,
   ../../../waku/node/waku_node,
-  ../../alloc,
   ../../../waku/node/peer_manager
 
 type PeerManagementMsgType* {.pure.} = enum
@@ -57,7 +56,7 @@ proc destroyShared(self: ptr PeerManagementRequest) =
   deallocShared(self)
 
 proc process*(
-    self: ptr PeerManagementRequest, waku: Waku
+    self: ptr PeerManagementRequest, waku: ptr Waku
 ): Future[Result[string, string]] {.async.} =
   defer:
     destroyShared(self)
@@ -65,18 +64,18 @@ proc process*(
   case self.operation
   of CONNECT_TO:
     let peers = ($self[].peerMultiAddr).split(",").mapIt(strip(it))
-    await waku.node.connectToNodes(peers, source = "static")
+    await waku[].node.connectToNodes(peers, source = "static")
     return ok("")
   of GET_ALL_PEER_IDS:
     ## returns a comma-separated string of peerIDs
     let peerIDs =
-      waku.node.peerManager.switch.peerStore.peers().mapIt($it.peerId).join(",")
+      waku[].node.peerManager.switch.peerStore.peers().mapIt($it.peerId).join(",")
     return ok(peerIDs)
   of GET_CONNECTED_PEERS_INFO:
     ## returns a JSON string mapping peerIDs to objects with protocols and addresses
 
     var peersMap = initTable[string, PeerInfo]()
-    let peers = waku.node.peerManager.switch.peerStore.peers().filterIt(
+    let peers = waku[].node.peerManager.switch.peerStore.peers().filterIt(
         it.connectedness == Connected
       )
 
@@ -92,7 +91,7 @@ proc process*(
     return ok(jsonStr)
   of GET_PEER_IDS_BY_PROTOCOL:
     ## returns a comma-separated string of peerIDs that mount the given protocol
-    let connectedPeers = waku.node.peerManager.switch.peerStore
+    let connectedPeers = waku[].node.peerManager.switch.peerStore
       .peers($self[].protocol)
       .filterIt(it.connectedness == Connected)
       .mapIt($it.peerId)
@@ -102,16 +101,16 @@ proc process*(
     let peerId = PeerId.init($self[].peerId).valueOr:
       error "DISCONNECT_PEER_BY_ID failed", error = $error
       return err($error)
-    await waku.node.peerManager.disconnectNode(peerId)
+    await waku[].node.peerManager.disconnectNode(peerId)
     return ok("")
   of DISCONNECT_ALL_PEERS:
-    await waku.node.peerManager.disconnectAllPeers()
+    await waku[].node.peerManager.disconnectAllPeers()
     return ok("")
   of DIAL_PEER:
     let remotePeerInfo = parsePeerInfo($self[].peerMultiAddr).valueOr:
       error "DIAL_PEER failed", error = $error
       return err($error)
-    let conn = await waku.node.peerManager.dialPeer(remotePeerInfo, $self[].protocol)
+    let conn = await waku[].node.peerManager.dialPeer(remotePeerInfo, $self[].protocol)
     if conn.isNone():
       let msg = "failed dialing peer"
       error "DIAL_PEER failed", error = msg, peerId = $remotePeerInfo.peerId
@@ -120,7 +119,7 @@ proc process*(
     let peerId = PeerId.init($self[].peerId).valueOr:
       error "DIAL_PEER_BY_ID failed", error = $error
       return err($error)
-    let conn = await waku.node.peerManager.dialPeer(peerId, $self[].protocol)
+    let conn = await waku[].node.peerManager.dialPeer(peerId, $self[].protocol)
     if conn.isNone():
       let msg = "failed dialing peer"
       error "DIAL_PEER_BY_ID failed", error = msg, peerId = $peerId
@@ -128,7 +127,7 @@ proc process*(
   of GET_CONNECTED_PEERS:
     ## returns a comma-separated string of peerIDs
     let
-      (inPeerIds, outPeerIds) = waku.node.peerManager.connectedPeers()
+      (inPeerIds, outPeerIds) = waku[].node.peerManager.connectedPeers()
       connectedPeerids = concat(inPeerIds, outPeerIds)
     return ok(connectedPeerids.mapIt($it).join(","))
 

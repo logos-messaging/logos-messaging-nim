@@ -1,13 +1,12 @@
 import std/json
-import chronos, chronicles, results, strutils, libp2p/multiaddress
+import chronos, chronicles, results, strutils, libp2p/multiaddress, ffi
 import
   ../../../waku/factory/waku,
   ../../../waku/discovery/waku_dnsdisc,
   ../../../waku/discovery/waku_discv5,
   ../../../waku/waku_core/peers,
-  ../../../waku/node/waku_node,
+  ../../../waku/node/waku_node
   ../../../waku/node/kernel_api,
-  ../../alloc
 
 type DiscoveryMsgType* = enum
   GET_BOOTSTRAP_NODES

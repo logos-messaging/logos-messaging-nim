@@ -1,8 +1,7 @@
 import std/[json, sugar, strutils, options]
-import chronos, chronicles, results, stew/byteutils
+import chronos, chronicles, results, stew/byteutils, ffi
 import
   ../../../../waku/factory/waku,
-  ../../../alloc,
   ../../../utils,
   ../../../../waku/waku_core/peers,
   ../../../../waku/waku_core/time,

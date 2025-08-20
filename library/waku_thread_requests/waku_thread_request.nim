@@ -3,10 +3,9 @@
 ## the Waku Thread.
 
 import std/json, results
-import chronos, chronos/threadsync
+import chronos, chronos/threadsync, ffi
 import
   ../../waku/factory/waku,
-  ../ffi_types,
   ./requests/node_lifecycle_request,
   ./requests/peer_manager_request,
   ./requests/protocols/relay_request,
@@ -31,14 +30,14 @@ type RequestType* {.pure.} = enum
 type WakuThreadRequest* = object
   reqType: RequestType
   reqContent: pointer
-  callback: WakuCallBack
+  callback: FFICallBack
   userData: pointer
 
 proc createShared*(
     T: type WakuThreadRequest,
     reqType: RequestType,
     reqContent: pointer,
-    callback: WakuCallBack,
+    callback: FFICallBack,
     userData: pointer,
 ): ptr type T =
   var ret = createShared(T)
@@ -78,7 +77,7 @@ proc process*(
     T: type WakuThreadRequest, request: ptr WakuThreadRequest, waku: ptr Waku
 ) {.async.} =
   let retFut =
-    case request[].reqType
+    case request[].reqId
     of LIFECYCLE:
       cast[ptr NodeLifecycleRequest](request[].reqContent).process(waku)
     of PEER_MANAGER:

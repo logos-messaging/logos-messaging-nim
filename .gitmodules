@@ -188,4 +188,4 @@
 	path = vendor/nim-ffi
 	url = https://github.com/waku-org/nim-ffi/
 	ignore = untracked
-	branch = main
+	branch = master

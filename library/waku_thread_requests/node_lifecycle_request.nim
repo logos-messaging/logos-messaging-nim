@@ -6,36 +6,9 @@ import
   tools/confutils/cli_args,
   waku/factory/waku,
   waku/factory/node_factory,
-  waku/factory/networks_config,
   waku/factory/app_callbacks,
-  waku/waku_api/rest/builder
-
-import 
-
-type NodeLifecycleMsgType* = enum
-  CREATE_NODE
-  START_NODE
-  STOP_NODE
-
-type NodeLifecycleRequest* = object
-  operation: NodeLifecycleMsgType
-  configJson: cstring ## Only used in 'CREATE_NODE' operation
-  appCallbacks: AppCallbacks
-
-proc createShared*(
-    T: type NodeLifecycleRequest,
-    op: NodeLifecycleMsgType,
-    configJson: cstring = "",
-    appCallbacks: AppCallbacks = nil,
-): ptr type T =
-  var ret = createShared(T)
-  ret[].appCallbacks = appCallbacks
-  ret[].configJson = configJson.alloc()
-  return ret
-
-proc destroyShared(self: ptr NodeLifecycleRequest) =
-  deallocShared(self[].configJson)
-  deallocShared(self)
+  waku/rest_api/endpoint/builder,
+  library/declare_lib
 
 proc createWaku(
     configJson: cstring, appCallbacks: AppCallbacks = nil
@@ -85,26 +58,29 @@ proc createWaku(
 
   return ok(wakuRes)
 
-proc process*(
-    self: ptr NodeLifecycleRequest, waku: ptr Waku
-): Future[Result[string, string]] {.async.} =
-  defer:
-    destroyShared(self)
-
-  case self.operation
-  of CREATE_NODE:
-    waku[] = (await createWaku(self.configJson, self.appCallbacks)).valueOr:
-      error "CREATE_NODE failed", error = error
+registerReqFFI(CreateNodeRequest, waku: ptr Waku):
+  proc(
+      configJson: cstring, appCallbacks: AppCallbacks
+  ): Future[Result[string, string]] {.async.} =
+    waku[] = (await createWaku(configJson, cast[AppCallbacks](appCallbacks))).valueOr:
+      error "CreateNodeRequest failed", error = error
       return err($error)
-  of START_NODE:
-    (await waku.startWaku()).isOkOr:
-      error "START_NODE failed", error = error
-      return err($error)
-  of STOP_NODE:
-    try:
-      await waku[].stop()
-    except Exception:
-      error "STOP_NODE failed", error = getCurrentExceptionMsg()
-      return err(getCurrentExceptionMsg())
+    return ok("")
 
+proc waku_start(
+    ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
+) {.ffi.} =
+  (await startWaku(addr ctx.myLib)).isOkOr:
+    error "START_NODE failed", error = error
+    return err("failed to start: " & $error)
+  return ok("")
+
+proc waku_stop(
+    ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
+) {.ffi.} =
+  try:
+    await ctx.myLib.stop()
+  except Exception as exc:
+    error "STOP_NODE failed", error = exc.msg
+    return err("failed to stop: " & exc.msg)
   return ok("")

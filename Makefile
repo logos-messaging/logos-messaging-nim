@@ -136,7 +136,7 @@ deps: | deps-common nat-libs waku.nims
 ifeq ($(DEBUG), 0)
 NIM_PARAMS := $(NIM_PARAMS) -d:release
 else
-NIM_PARAMS := $(NIM_PARAMS) -d:debug
+NIM_PARAMS := $(NIM_PARAMS) -d:debug -d:libp2p_network_protocols_metrics
 endif
 
 ifeq ($(USE_LIBBACKTRACE), 0)

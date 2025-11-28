@@ -34,7 +34,7 @@ else
     fi
 
     # Run foundryup to install the required version
-    if [ -n "$git" ]; then
+    if [ -n "$REQUIRED_FOUNDRY_VERSION" ]; then
         echo "Installing Foundry tools version $REQUIRED_FOUNDRY_VERSION..."
         foundryup --install "$REQUIRED_FOUNDRY_VERSION"
     else

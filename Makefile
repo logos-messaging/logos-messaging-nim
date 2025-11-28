@@ -119,7 +119,7 @@ endif
 ##################
 .PHONY: deps libbacktrace
 
-FOUNDRY_VERSION := 1.5.0
+FOUNDRY_VERSION := 1.4.2
 
 rustup:
 ifeq (, $(shell which cargo))

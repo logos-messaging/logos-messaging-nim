@@ -17,26 +17,13 @@ if command -v pnpm &> /dev/null; then
         fi
     fi
 else
-    # Install pnpm using the standalone installer
+    # Install pnpm using npm
     if [ -n "$REQUIRED_PNPM_VERSION" ]; then
         echo "Installing pnpm version $REQUIRED_PNPM_VERSION..."
-        curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=$REQUIRED_PNPM_VERSION sh -
+        npm install -g pnpm@$REQUIRED_PNPM_VERSION
     else
         echo "Installing latest pnpm..."
-        curl -fsSL https://get.pnpm.io/install.sh | sh -
-    fi
-
-    # Set PNPM_HOME and add to PATH (same as what the installer adds to .bashrc)
-    export PNPM_HOME="$HOME/.local/share/pnpm"
-    case ":$PATH:" in
-        *":$PNPM_HOME:"*) ;;
-        *) export PATH="$PNPM_HOME:$PATH" ;;
-    esac
-
-    # If running in GitHub Actions, persist the PATH change
-    if [ -n "$GITHUB_PATH" ]; then
-        echo "$PNPM_HOME" >> "$GITHUB_PATH"
-        echo "Added $PNPM_HOME to GITHUB_PATH"
+        npm install -g pnpm
     fi
 
     # Verify pnpm was installed

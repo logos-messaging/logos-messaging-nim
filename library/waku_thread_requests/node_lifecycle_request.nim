@@ -58,19 +58,20 @@ proc createWaku(
 
   return ok(wakuRes)
 
-registerReqFFI(CreateNodeRequest, waku: ptr Waku):
+registerReqFFI(CreateNodeRequest, ctx: ptr FFIContext[Waku]):
   proc(
       configJson: cstring, appCallbacks: AppCallbacks
   ): Future[Result[string, string]] {.async.} =
-    waku[] = (await createWaku(configJson, cast[AppCallbacks](appCallbacks))).valueOr:
+    ctx.myLib[] = (await createWaku(configJson, cast[AppCallbacks](appCallbacks))).valueOr:
       error "CreateNodeRequest failed", error = error
       return err($error)
+
     return ok("")
 
 proc waku_start(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
-  (await startWaku(addr ctx.myLib)).isOkOr:
+  (await startWaku(ctx[].myLib)).isOkOr:
     error "START_NODE failed", error = error
     return err("failed to start: " & $error)
   return ok("")
@@ -79,7 +80,7 @@ proc waku_stop(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
   try:
-    await ctx.myLib.stop()
+    await ctx.myLib[].stop()
   except Exception as exc:
     error "STOP_NODE failed", error = exc.msg
     return err("failed to stop: " & exc.msg)

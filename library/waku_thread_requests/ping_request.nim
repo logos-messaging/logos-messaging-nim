@@ -17,11 +17,11 @@ proc waku_ping_peer(
   proc ping(): Future[Result[Duration, string]] {.async, gcsafe.} =
     try:
       let conn =
-        await ctx.myLib.node.switch.dial(peerInfo.peerId, peerInfo.addrs, PingCodec)
+        await ctx.myLib[].node.switch.dial(peerInfo.peerId, peerInfo.addrs, PingCodec)
       defer:
         await conn.close()
 
-      let pingRTT = await ctx.myLib.node.libp2pPing.ping(conn)
+      let pingRTT = await ctx.myLib[].node.libp2pPing.ping(conn)
       if pingRTT == 0.nanos:
         return err("could not ping peer: rtt-0")
       return ok(pingRTT)

@@ -11,7 +11,7 @@ proc waku_get_peerids_from_peerstore(
 ) {.ffi.} =
   ## returns a comma-separated string of peerIDs
   let peerIDs =
-    ctx.myLib.node.peerManager.switch.peerStore.peers().mapIt($it.peerId).join(",")
+    ctx.myLib[].node.peerManager.switch.peerStore.peers().mapIt($it.peerId).join(",")
   return ok(peerIDs)
 
 proc waku_connect(
@@ -22,7 +22,7 @@ proc waku_connect(
     timeoutMs: cuint,
 ) {.ffi.} =
   let peers = ($peerMultiAddr).split(",").mapIt(strip(it))
-  await ctx.myLib.node.connectToNodes(peers, source = "static")
+  await ctx.myLib[].node.connectToNodes(peers, source = "static")
   return ok("")
 
 proc waku_disconnect_peer_by_id(
@@ -31,13 +31,13 @@ proc waku_disconnect_peer_by_id(
   let pId = PeerId.init($peerId).valueOr:
     error "DISCONNECT_PEER_BY_ID failed", error = $error
     return err($error)
-  await ctx.myLib.node.peerManager.disconnectNode(pId)
+  await ctx.myLib[].node.peerManager.disconnectNode(pId)
   return ok("")
 
 proc waku_disconnect_all_peers(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
-  await ctx.myLib.node.peerManager.disconnectAllPeers()
+  await ctx.myLib[].node.peerManager.disconnectAllPeers()
   return ok("")
 
 proc waku_dial_peer(
@@ -51,7 +51,7 @@ proc waku_dial_peer(
   let remotePeerInfo = parsePeerInfo($peerMultiAddr).valueOr:
     error "DIAL_PEER failed", error = $error
     return err($error)
-  let conn = await ctx.myLib.node.peerManager.dialPeer(remotePeerInfo, $protocol)
+  let conn = await ctx.myLib[].node.peerManager.dialPeer(remotePeerInfo, $protocol)
   if conn.isNone():
     let msg = "failed dialing peer"
     error "DIAL_PEER failed", error = msg, peerId = $remotePeerInfo.peerId
@@ -69,7 +69,7 @@ proc waku_dial_peer_by_id(
   let pId = PeerId.init($peerId).valueOr:
     error "DIAL_PEER_BY_ID failed", error = $error
     return err($error)
-  let conn = await ctx.myLib.node.peerManager.dialPeer(pId, $protocol)
+  let conn = await ctx.myLib[].node.peerManager.dialPeer(pId, $protocol)
   if conn.isNone():
     let msg = "failed dialing peer"
     error "DIAL_PEER_BY_ID failed", error = msg, peerId = $peerId
@@ -83,7 +83,7 @@ proc waku_get_connected_peers_info(
   ## returns a JSON string mapping peerIDs to objects with protocols and addresses
 
   var peersMap = initTable[string, PeerInfo]()
-  let peers = ctx.myLib.node.peerManager.switch.peerStore.peers().filterIt(
+  let peers = ctx.myLib[].node.peerManager.switch.peerStore.peers().filterIt(
       it.connectedness == Connected
     )
 
@@ -103,7 +103,7 @@ proc waku_get_connected_peers(
 ) {.ffi.} =
   ## returns a comma-separated string of peerIDs
   let
-    (inPeerIds, outPeerIds) = ctx.myLib.node.peerManager.connectedPeers()
+    (inPeerIds, outPeerIds) = ctx.myLib[].node.peerManager.connectedPeers()
     connectedPeerids = concat(inPeerIds, outPeerIds)
 
   return ok(connectedPeerids.mapIt($it).join(","))
@@ -115,7 +115,7 @@ proc waku_get_peerids_by_protocol(
     protocol: cstring,
 ) {.ffi.} =
   ## returns a comma-separated string of peerIDs that mount the given protocol
-  let connectedPeers = ctx.myLib.node.peerManager.switch.peerStore
+  let connectedPeers = ctx.myLib[].node.peerManager.switch.peerStore
     .peers($protocol)
     .filterIt(it.connectedness == Connected)
     .mapIt($it.peerId)

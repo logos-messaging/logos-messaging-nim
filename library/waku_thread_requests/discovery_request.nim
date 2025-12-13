@@ -47,7 +47,7 @@ proc waku_discv5_update_bootnodes(
   ## Updates the bootnode list used for discovering new peers via DiscoveryV5
   ## bootnodes - JSON array containing the bootnode ENRs i.e. `["enr:...", "enr:..."]`
 
-  updateDiscv5BootstrapNodes($bootnodes, ctx.myLib).isOkOr:
+  updateDiscv5BootstrapNodes($bootnodes, ctx.myLib[]).isOkOr:
     error "UPDATE_DISCV5_BOOTSTRAP_NODES failed", error = error
     return err($error)
 
@@ -71,7 +71,7 @@ proc waku_dns_discovery(
 proc waku_start_discv5(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
-  (await ctx.myLib.wakuDiscv5.start()).isOkOr:
+  (await ctx.myLib[].wakuDiscv5.start()).isOkOr:
     error "START_DISCV5 failed", error = error
     return err("error starting discv5: " & $error)
 
@@ -80,7 +80,7 @@ proc waku_start_discv5(
 proc waku_stop_discv5(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
-  await ctx.myLib.wakuDiscv5.stop()
+  await ctx.myLib[].wakuDiscv5.stop()
   return ok("discv5 stopped correctly")
 
 proc waku_peer_exchange_request(
@@ -89,7 +89,7 @@ proc waku_peer_exchange_request(
     userData: pointer,
     numPeers: uint64,
 ) {.ffi.} =
-  let numValidPeers = (await performPeerExchangeRequestTo(numPeers, ctx.myLib)).valueOr:
+  let numValidPeers = (await performPeerExchangeRequestTo(numPeers, ctx.myLib[])).valueOr:
     error "waku_peer_exchange_request failed", error = error
     return err("failed peer exchange: " & $error)
 

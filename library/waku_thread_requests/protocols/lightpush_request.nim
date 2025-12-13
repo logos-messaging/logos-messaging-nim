@@ -18,7 +18,7 @@ proc waku_lightpush_publish(
     pubSubTopic: cstring,
     jsonWakuMessage: cstring,
 ) {.ffi.} =
-  if ctx.myLib.node.wakuLightpushClient.isNil():
+  if ctx.myLib[].node.wakuLightpushClient.isNil():
     let errorMsg = "LightpushRequest waku.node.wakuLightpushClient is nil"
     error "PUBLISH failed", error = errorMsg
     return err(errorMsg)
@@ -34,14 +34,14 @@ proc waku_lightpush_publish(
   let msg = json_message_event.toWakuMessage(jsonMessage).valueOr:
     return err("Problem building the WakuMessage: " & $error)
 
-  let peerOpt = ctx.myLib.node.peerManager.selectPeer(WakuLightPushCodec)
+  let peerOpt = ctx.myLib[].node.peerManager.selectPeer(WakuLightPushCodec)
   if peerOpt.isNone():
     let errorMsg = "failed to lightpublish message, no suitable remote peers"
     error "PUBLISH failed", error = errorMsg
     return err(errorMsg)
 
   let msgHashHex = (
-    await ctx.myLib.node.wakuLegacyLightpushClient.publish(
+    await ctx.myLib[].node.wakuLegacyLightpushClient.publish(
       $pubsubTopic, msg, peer = peerOpt.get()
     )
   ).valueOr:

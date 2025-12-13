@@ -36,18 +36,18 @@ proc waku_filter_subscribe(
       callEventCallback(ctx, "onReceivedMessage"):
         $JsonMessageEvent.new(pubsubTopic, msg)
 
-  checkFilterClientMounted(ctx.myLib).isOkOr:
+  checkFilterClientMounted(ctx.myLib[]).isOkOr:
     return err($error)
 
   var filterPushEventCallback = FilterPushHandler(onReceivedMessage(ctx))
-  ctx.myLib.node.wakuFilterClient.registerPushHandler(filterPushEventCallback)
+  ctx.myLib[].node.wakuFilterClient.registerPushHandler(filterPushEventCallback)
 
-  let peer = ctx.myLib.node.peerManager.selectPeer(WakuFilterSubscribeCodec).valueOr:
+  let peer = ctx.myLib[].node.peerManager.selectPeer(WakuFilterSubscribeCodec).valueOr:
     let errorMsg = "could not find peer with WakuFilterSubscribeCodec when subscribing"
     error "fail filter subscribe", error = errorMsg
     return err(errorMsg)
 
-  let subFut = ctx.myLib.node.filterSubscribe(
+  let subFut = ctx.myLib[].node.filterSubscribe(
     some(PubsubTopic($pubsubTopic)),
     ($contentTopics).split(",").mapIt(ContentTopic(it)),
     peer,
@@ -67,16 +67,16 @@ proc waku_filter_unsubscribe(
     pubSubTopic: cstring,
     contentTopics: cstring,
 ) {.ffi.} =
-  checkFilterClientMounted(ctx.myLib).isOkOr:
+  checkFilterClientMounted(ctx.myLib[]).isOkOr:
     return err($error)
 
-  let peer = ctx.myLib.node.peerManager.selectPeer(WakuFilterSubscribeCodec).valueOr:
+  let peer = ctx.myLib[].node.peerManager.selectPeer(WakuFilterSubscribeCodec).valueOr:
     let errorMsg =
       "could not find peer with WakuFilterSubscribeCodec when unsubscribing"
     error "fail filter process", error = errorMsg
     return err(errorMsg)
 
-  let subFut = ctx.myLib.node.filterUnsubscribe(
+  let subFut = ctx.myLib[].node.filterUnsubscribe(
     some(PubsubTopic($pubsubTopic)),
     ($contentTopics).split(",").mapIt(ContentTopic(it)),
     peer,
@@ -90,16 +90,16 @@ proc waku_filter_unsubscribe(
 proc waku_filter_unsubscribe_all(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
-  checkFilterClientMounted(ctx.myLib).isOkOr:
+  checkFilterClientMounted(ctx.myLib[]).isOkOr:
     return err($error)
 
-  let peer = ctx.myLib.node.peerManager.selectPeer(WakuFilterSubscribeCodec).valueOr:
+  let peer = ctx.myLib[].node.peerManager.selectPeer(WakuFilterSubscribeCodec).valueOr:
     let errorMsg =
       "could not find peer with WakuFilterSubscribeCodec when unsubscribing all"
     error "fail filter unsubscribe all", error = errorMsg
     return err(errorMsg)
 
-  let unsubFut = ctx.myLib.node.filterUnsubscribeAll(peer)
+  let unsubFut = ctx.myLib[].node.filterUnsubscribeAll(peer)
 
   if not await unsubFut.withTimeout(FilterOpTimeout):
     let errorMsg = "filter un-subscription all timed out"

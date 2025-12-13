@@ -19,7 +19,7 @@ proc waku_relay_get_peers_in_mesh(
     userData: pointer,
     pubSubTopic: cstring,
 ) {.ffi.} =
-  let meshPeers = ctx.myLib.node.wakuRelay.getPeersInMesh($pubsubTopic).valueOr:
+  let meshPeers = ctx.myLib[].node.wakuRelay.getPeersInMesh($pubsubTopic).valueOr:
     error "LIST_MESH_PEERS failed", error = error
     return err($error)
   ## returns a comma-separated string of peerIDs
@@ -31,7 +31,7 @@ proc waku_relay_get_num_peers_in_mesh(
     userData: pointer,
     pubSubTopic: cstring,
 ) {.ffi.} =
-  let numPeersInMesh = ctx.myLib.node.wakuRelay.getNumPeersInMesh($pubsubTopic).valueOr:
+  let numPeersInMesh = ctx.myLib[].node.wakuRelay.getNumPeersInMesh($pubsubTopic).valueOr:
     error "NUM_MESH_PEERS failed", error = error
     return err($error)
   return ok($numPeersInMesh)
@@ -43,7 +43,7 @@ proc waku_relay_get_connected_peers(
     pubSubTopic: cstring,
 ) {.ffi.} =
   ## Returns the list of all connected peers to an specific pubsub topic
-  let connPeers = ctx.myLib.node.wakuRelay.getConnectedPeers($pubsubTopic).valueOr:
+  let connPeers = ctx.myLib[].node.wakuRelay.getConnectedPeers($pubsubTopic).valueOr:
     error "LIST_CONNECTED_PEERS failed", error = error
     return err($error)
   ## returns a comma-separated string of peerIDs
@@ -55,7 +55,7 @@ proc waku_relay_get_num_connected_peers(
     userData: pointer,
     pubSubTopic: cstring,
 ) {.ffi.} =
-  let numConnPeers = ctx.myLib.node.wakuRelay.getNumConnectedPeers($pubsubTopic).valueOr:
+  let numConnPeers = ctx.myLib[].node.wakuRelay.getNumConnectedPeers($pubsubTopic).valueOr:
     error "NUM_CONNECTED_PEERS failed", error = error
     return err($error)
   return ok($numConnPeers)
@@ -72,7 +72,7 @@ proc waku_relay_add_protected_shard(
   try:
     let relayShard = RelayShard(clusterId: uint16(clusterId), shardId: uint16(shardId))
     let protectedShard = ProtectedShard.parseCmdArg($relayShard & ":" & $publicKey)
-    ctx.myLib.node.wakuRelay.addSignedShardsValidator(
+    ctx.myLib[].node.wakuRelay.addSignedShardsValidator(
       @[protectedShard], uint16(clusterId)
     )
   except ValueError as exc:
@@ -94,7 +94,7 @@ proc waku_relay_subscribe(
 
   var cb = onReceivedMessage(ctx)
 
-  ctx.myLib.node.subscribe(
+  ctx.myLib[].node.subscribe(
     (kind: SubscriptionKind.PubsubSub, topic: $pubsubTopic),
     handler = WakuRelayHandler(cb),
   ).isOkOr:
@@ -108,7 +108,7 @@ proc waku_relay_unsubscribe(
     userData: pointer,
     pubSubTopic: cstring,
 ) {.ffi.} =
-  ctx.myLib.node.unsubscribe((kind: SubscriptionKind.PubsubSub, topic: $pubsubTopic)).isOkOr:
+  ctx.myLib[].node.unsubscribe((kind: SubscriptionKind.PubsubSub, topic: $pubsubTopic)).isOkOr:
     error "UNSUBSCRIBE failed", error = error
     return err($error)
 
@@ -135,7 +135,7 @@ proc waku_relay_publish(
   let msg = json_message_event.toWakuMessage(jsonMessage).valueOr:
     return err("Problem building the WakuMessage: " & $error)
 
-  (await ctx.myLib.node.wakuRelay.publish($pubsubTopic, msg)).isOkOr:
+  (await ctx.myLib[].node.wakuRelay.publish($pubsubTopic, msg)).isOkOr:
     error "PUBLISH failed", error = error
     return err($error)
 

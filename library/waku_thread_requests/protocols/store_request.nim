@@ -86,7 +86,7 @@ proc waku_store_query(
     return err("StoreRequest failed to parse peer addr: " & $error)
 
   let queryResponse = (
-    await ctx.myLib.node.wakuStoreClient.query(storeQueryRequest, peer)
+    await ctx.myLib[].node.wakuStoreClient.query(storeQueryRequest, peer)
   ).valueOr:
     return err("StoreRequest failed store query: " & $error)
 

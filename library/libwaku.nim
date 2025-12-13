@@ -15,15 +15,15 @@ import
 ################################################################################
 ## Include different APIs, i.e. all procs with {.ffi.} pragma
 include
-  ./waku_thread_requests/peer_manager_request,
-  ./waku_thread_requests/discovery_request,
-  ./waku_thread_requests/node_lifecycle_request,
-  ./waku_thread_requests/debug_node_request,
-  ./waku_thread_requests/ping_request,
-  ./waku_thread_requests/protocols/relay_request,
-  ./waku_thread_requests/protocols/store_request,
-  ./waku_thread_requests/protocols/lightpush_request,
-  ./waku_thread_requests/protocols/filter_request
+  ./kernel_api/peer_manager_api,
+  ./kernel_api/discovery_api,
+  ./kernel_api/node_lifecycle_api,
+  ./kernel_api/debug_node_api,
+  ./kernel_api/ping_api,
+  ./kernel_api/protocols/relay_api,
+  ./kernel_api/protocols/store_api,
+  ./kernel_api/protocols/lightpush_api,
+  ./kernel_api/protocols/filter_api
 
 ################################################################################
 ### Exported procs

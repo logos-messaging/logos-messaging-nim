@@ -212,7 +212,7 @@ proc makeProcType(
     let raisesPragma = newTree(
       nnkExprColonExpr, ident("raises"), newTree(nnkBracket, ident("CatchableError"))
     )
-    let pragmas = newTree(nnkPragma, raisesPragma)
+    let pragmas = newTree(nnkPragma, raisesPragma, ident("gcsafe"))
     newTree(nnkProcTy, formal, pragmas)
 
 proc parseMode(modeNode: NimNode): RequestBrokerMode =
@@ -499,7 +499,7 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
         quote do:
           proc request*(
               _: typedesc[`typeIdent`]
-          ): Result[`typeIdent`, string] {.raises: [].} =
+          ): Result[`typeIdent`, string] {.gcsafe, raises: [].} =
             let provider = `accessProcIdent`().`zeroArgFieldName`
             if provider.isNil():
               return err(
@@ -564,7 +564,7 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
           {.async: (raises: []), gcsafe.}
       of rbSync:
         quote:
-          {.raises: [].}
+          {.gcsafe, raises: [].}
     var providerCall = newCall(providerSym)
     for argName in argNameIdents:
       providerCall.add(argName)

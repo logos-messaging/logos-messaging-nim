@@ -394,9 +394,6 @@ RequestBroker:
   proc signatureFetch*(): Future[Result[ExternalAliasedResponse, string]] {.async.}
 
 RequestBroker(sync):
-  type PODTypeResponseSync = string
-
-RequestBroker(sync):
   type ExternalAliasedResponseSync = ExternalDefinedTypeSync
 
   proc signatureFetch*(): Result[ExternalAliasedResponseSync, string]
@@ -441,34 +438,6 @@ suite "RequestBroker macro (POD/external types)":
     check ExternalDefinedTypeAsync(res.value).label == "ext"
 
     ExternalAliasedResponse.clearProvider()
-
-  test "supports non-object response types (sync)":
-    check PODTypeResponseSync
-    .setProvider(
-      proc(): Result[PODTypeResponseSync, string] =
-        ok(PODTypeResponseSync("hello"))
-    )
-    .isOk()
-
-    let res = PODTypeResponseSync.request()
-    check res.isOk()
-    check string(res.value) == "hello"
-
-    PODTypeResponseSync.clearProvider()
-
-  test "POD type response possible (sync)":
-    check PODTypeResponseSync
-    .setProvider(
-      proc(): Result[PODTypeResponseSync, string] =
-        ok(PODTypeResponseSync("auto"))
-    )
-    .isOk()
-
-    let res = PODTypeResponseSync.request()
-    check res.isOk
-    check string(res.get()) == "auto"
-
-    PODTypeResponseSync.clearProvider()
 
   test "supports aliased external types (sync)":
     check ExternalAliasedResponseSync

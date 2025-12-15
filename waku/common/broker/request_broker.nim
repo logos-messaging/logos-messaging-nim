@@ -123,7 +123,7 @@
 ##       ok("this is the info you wanted")
 ##   )
 ## let res = NeedThatInfo.request().valueOr:
-##   echo "not ok due" & error
+##   echo "not ok due to: " & error
 ##   NeedThatInfo(":-(")
 ##
 ## echo string(res)
@@ -478,7 +478,10 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
               await provider()
 
             if catchedRes.isErr():
-              return err("Request failed:" & catchedRes.error.msg)
+              return err(
+                "RequestBroker(" & `typeNameLit` & "): provider threw exception: " &
+                  catchedRes.error.msg
+              )
 
             let providerRes = catchedRes.get()
             if providerRes.isOk():
@@ -507,7 +510,10 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
             try:
               providerRes = provider()
             except CatchableError as e:
-              return err("Request failed:" & e.msg)
+              return err(
+                "RequestBroker(" & `typeNameLit` & "): provider threw exception: " &
+                  e.msg
+              )
 
             if providerRes.isOk():
               let resultValue = providerRes.get()
@@ -583,7 +589,10 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
           let catchedRes = catch:
             await `providerCall`
           if catchedRes.isErr():
-            return err("Request failed:" & catchedRes.error.msg)
+            return err(
+              "RequestBroker(" & `typeNameLit` & "): provider threw exception: " &
+                catchedRes.error.msg
+            )
 
           let providerRes = catchedRes.get()
           if providerRes.isOk():
@@ -602,7 +611,9 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
           try:
             providerRes = `providerCall`
           except CatchableError as e:
-            return err("Request failed:" & e.msg)
+            return err(
+              "RequestBroker(" & `typeNameLit` & "): provider threw exception: " & e.msg
+            )
 
           if providerRes.isOk():
             let resultValue = providerRes.get()

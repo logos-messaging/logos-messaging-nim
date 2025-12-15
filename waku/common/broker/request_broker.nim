@@ -561,7 +561,7 @@ proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
       case mode
       of rbAsync:
         quote:
-          {.async: (raises: []), gcsafe.}
+          {.async: (raises: []).}
       of rbSync:
         quote:
           {.gcsafe, raises: [].}

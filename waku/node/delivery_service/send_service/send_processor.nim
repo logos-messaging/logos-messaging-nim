@@ -1,6 +1,8 @@
 import chronos
 import ./delivery_task
 
+{.push raises: [].}
+
 type BaseSendProcessor* = ref object of RootObj
   fallbackProcessor*: BaseSendProcessor
 
@@ -9,7 +11,7 @@ proc chain*(self: BaseSendProcessor, next: BaseSendProcessor) =
 
 method isValidProcessor*(
     self: BaseSendProcessor, task: DeliveryTask
-): Future[bool] {.async, base.} =
+): bool {.base, gcsafe.} =
   return false
 
 method sendImpl*(
@@ -23,7 +25,7 @@ method process*(
   var currentProcessor: BaseSendProcessor = self
   var keepTrying = true
   while not currentProcessor.isNil() and keepTrying:
-    if await currentProcessor.isValidProcessor(task):
+    if currentProcessor.isValidProcessor(task):
       await currentProcessor.sendImpl(task)
     currentProcessor = currentProcessor.fallbackProcessor
     keepTrying = task.state == DeliveryState.FallbackRetry

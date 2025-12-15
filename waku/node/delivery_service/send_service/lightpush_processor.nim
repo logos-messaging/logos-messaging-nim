@@ -30,7 +30,7 @@ proc isLightpushPeerAvailable(
 
 method isValidProcessor*(
     self: LightpushSendProcessor, task: DeliveryTask
-): Future[bool] {.async.} =
+): bool {.gcsafe.} =
   return self.isLightpushPeerAvailable(task.pubsubTopic)
 
 method sendImpl*(

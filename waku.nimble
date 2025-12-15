@@ -136,7 +136,7 @@ task testwakunode2, "Build & run wakunode2 app tests":
   test "all_tests_wakunode2"
 
 task example2, "Build Waku examples":
-  buildBinary "waku_example", "examples/"
+  buildBinary "api_example", "examples/api_example/"
   buildBinary "publisher", "examples/"
   buildBinary "subscriber", "examples/"
   buildBinary "filter_subscriber", "examples/"

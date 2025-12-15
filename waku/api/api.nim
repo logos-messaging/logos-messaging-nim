@@ -3,7 +3,7 @@ import chronicles, chronos, results
 import waku/factory/waku
 import waku/[requests/health_request, waku_core, waku_node]
 import waku/node/delivery_service/send_service
-import ./[api_conf, types], ./subscribe/subscribe
+import ./[api_conf, types]
 
 logScope:
   topics = "api"
@@ -26,7 +26,7 @@ proc checkApiAvailability(w: Waku): Result[void, string] =
 
   # check if health is satisfactory
   # If Node is not healthy, return err("Waku node is not healthy")
-  let healthStatus = waitFor RequestNodeHealth.request()
+  let healthStatus = RequestNodeHealth.request()
 
   if healthStatus.isErr():
     warn "Failed to get Waku node health status: ", error = healthStatus.error
@@ -36,17 +36,6 @@ proc checkApiAvailability(w: Waku): Result[void, string] =
       return err("Waku node is not healthy, has got no connections.")
 
   return ok()
-
-proc subscribe*(
-    w: Waku, contentTopic: ContentTopic
-): Future[Result[RequestId, string]] {.async.} =
-  ?checkApiAvailability(w)
-
-  let requestId = newRequestId(w.rng)
-
-  asyncSpawn w.subscribeImpl(requestId, contentTopic)
-
-  return ok(requestId)
 
 proc send*(
     w: Waku, envelope: MessageEnvelope

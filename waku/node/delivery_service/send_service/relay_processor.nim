@@ -26,8 +26,8 @@ proc new*(
   return
     RelaySendProcessor(publishProc: publishProc, fallbackStateToSet: fallbackStateToSet)
 
-proc isTopicHealthy(topic: PubsubTopic): Future[bool] {.async.} =
-  let healthReport = (await RequestRelayTopicsHealth.request(@[topic])).valueOr:
+proc isTopicHealthy(topic: PubsubTopic): bool {.gcsafe.} =
+  let healthReport = RequestRelayTopicsHealth.request(@[topic]).valueOr:
     return false
 
   if healthReport.topicHealth.len() < 1:
@@ -37,8 +37,8 @@ proc isTopicHealthy(topic: PubsubTopic): Future[bool] {.async.} =
 
 method isValidProcessor*(
     self: RelaySendProcessor, task: DeliveryTask
-): Future[bool] {.async.} =
-  return await isTopicHealthy(task.pubsubTopic)
+): bool {.gcsafe.} =
+  return isTopicHealthy(task.pubsubTopic)
 
 method sendImpl*(self: RelaySendProcessor, task: DeliveryTask): Future[void] {.async.} =
   task.tryCount.inc()

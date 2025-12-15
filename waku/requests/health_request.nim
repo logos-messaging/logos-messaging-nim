@@ -6,17 +6,15 @@ import waku/waku_core/topics
 
 export protocol_health, topic_health
 
-RequestBroker:
+RequestBroker(sync):
   type RequestNodeHealth* = object
     healthStatus*: NodeHealth
 
-RequestBroker:
+RequestBroker(sync):
   type RequestRelayTopicsHealth* = object
     topicHealth*: seq[tuple[topic: PubsubTopic, health: TopicHealth]]
 
-  proc signature(
-    topics: seq[PubsubTopic]
-  ): Future[Result[RequestRelayTopicsHealth, string]] {.async.}
+  proc signature(topics: seq[PubsubTopic]): Result[RequestRelayTopicsHealth, string]
 
 MultiRequestBroker:
   type RequestProtocolHealth* = object

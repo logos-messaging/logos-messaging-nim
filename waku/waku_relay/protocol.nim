@@ -326,9 +326,7 @@ proc initRelayObservers(w: WakuRelay) =
 
 proc initRequestProviders(w: WakuRelay) =
   RequestRelayTopicsHealth.setProvider(
-    proc(
-        topics: seq[PubsubTopic]
-    ): Future[Result[RequestRelayTopicsHealth, string]] {.async.} =
+    proc(topics: seq[PubsubTopic]): Result[RequestRelayTopicsHealth, string] =
       var collectedRes: RequestRelayTopicsHealth
       for topic in topics:
         let health = w.topicsHealth.getOrDefault(topic, TopicHealth.NOT_SUBSCRIBED)

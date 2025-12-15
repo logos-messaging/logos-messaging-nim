@@ -12,19 +12,25 @@ proc periodicSender(w: Waku): Future[void] {.async.} =
     proc(event: MessageSentEvent) {.async: (raises: []).} =
       echo "Message sent with request ID: ",
         event.requestId, " hash: ", event.messageHash
-  )
+  ).valueOr:
+    echo "Failed to listen to message sent event: ", error
+    return
 
   let errorListener = MessageErrorEvent.listen(
     proc(event: MessageErrorEvent) {.async: (raises: []).} =
       echo "Message failed to send with request ID: ",
         event.requestId, " error: ", event.error
-  )
+  ).valueOr:
+    echo "Failed to listen to message error event: ", error
+    return
 
   let propagatedListener = MessagePropagatedEvent.listen(
     proc(event: MessagePropagatedEvent) {.async: (raises: []).} =
       echo "Message propagated with request ID: ",
         event.requestId, " hash: ", event.messageHash
-  )
+  ).valueOr:
+    echo "Failed to listen to message propagated event: ", error
+    return
 
   defer:
     MessageSentEvent.dropListener(sentListener)

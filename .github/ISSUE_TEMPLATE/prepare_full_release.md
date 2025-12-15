@@ -10,7 +10,7 @@ assignees: ''
 <!--
 Add appropriate release number to title!
 
-For detailed info on the release process refer to https://github.com/waku-org/nwaku/blob/master/docs/contributors/release-process.md
+For detailed info on the release process refer to https://github.com/logos-messaging/nwaku/blob/master/docs/contributors/release-process.md
  -->
 
 ### Items to complete
@@ -54,11 +54,11 @@ All items below are to be completed by the owner of the given release.
 
 - [ ] **Proceed with release**
 
-  - [ ] Assign a final release tag (`v0.X.0`) to the same commit that contains the validated release-candidate tag (e.g. `v0.X.0`). 
-  - [ ] Update [nwaku-compose](https://github.com/waku-org/nwaku-compose) and [waku-simulator](https://github.com/waku-org/waku-simulator) according to the new release.
-  - [ ] Bump nwaku dependency in [waku-rust-bindings](https://github.com/waku-org/waku-rust-bindings) and make sure all examples and tests work.
-  - [ ] Bump nwaku dependency in [waku-go-bindings](https://github.com/waku-org/waku-go-bindings) and make sure all tests work.
-  - [ ] Create GitHub release (https://github.com/waku-org/nwaku/releases).
+  - [ ] Assign a final release tag (`v0.X.0`) to the same commit that contains the validated release-candidate tag (e.g. `v0.X.0`).
+  - [ ] Update [nwaku-compose](https://github.com/logos-messaging/nwaku-compose) and [waku-simulator](https://github.com/logos-messaging/waku-simulator) according to the new release.
+  - [ ] Bump nwaku dependency in [waku-rust-bindings](https://github.com/logos-messaging/waku-rust-bindings) and make sure all examples and tests work.
+  - [ ] Bump nwaku dependency in [waku-go-bindings](https://github.com/logos-messaging/waku-go-bindings) and make sure all tests work.
+  - [ ] Create GitHub release (https://github.com/logos-messaging/nwaku/releases).
   - [ ] Submit a PR to merge the release branch back to `master`. Make sure you use the option "Merge pull request (Create a merge commit)" to perform the merge. Ping repo admin if this option is not available.
 
 - [ ] **Promote release to fleets**
@@ -67,8 +67,8 @@ All items below are to be completed by the owner of the given release.
 
 ### Links
 
-- [Release process](https://github.com/waku-org/nwaku/blob/master/docs/contributors/release-process.md)
-- [Release notes](https://github.com/waku-org/nwaku/blob/master/CHANGELOG.md)
+- [Release process](https://github.com/logos-messaging/nwaku/blob/master/docs/contributors/release-process.md)
+- [Release notes](https://github.com/logos-messaging/nwaku/blob/master/CHANGELOG.md)
 - [Fleet ownership](https://www.notion.so/Fleet-Ownership-7532aad8896d46599abac3c274189741?pvs=4#d2d2f0fe4b3c429fbd860a1d64f89a64)
 - [Infra-nim-waku](https://github.com/status-im/infra-nim-waku)
 - [Jenkins](https://ci.infra.status.im/job/nim-waku/)

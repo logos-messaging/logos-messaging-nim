@@ -181,6 +181,6 @@
 	branch = master
 [submodule "vendor/waku-rlnv2-contract"]
 	path = vendor/waku-rlnv2-contract
-	url = https://github.com/waku-org/waku-rlnv2-contract.git
+	url = https://github.com/logos-messaging/waku-rlnv2-contract.git
 	ignore = untracked
 	branch = master

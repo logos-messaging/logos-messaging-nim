@@ -184,3 +184,9 @@
 	url = https://github.com/logos-messaging/waku-rlnv2-contract.git
 	ignore = untracked
 	branch = master
+[submodule "vendor/nim-lsquic"]
+	path = vendor/nim-lsquic
+	url = https://github.com/vacp2p/nim-lsquic
+[submodule "vendor/nim-jwt"]
+	path = vendor/nim-jwt
+	url = https://github.com/vacp2p/nim-jwt.git

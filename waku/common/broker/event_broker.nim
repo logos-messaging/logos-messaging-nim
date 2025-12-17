@@ -90,103 +90,15 @@ import ./helper/broker_utils, broker_context
 
 export chronicles, results, chronos, broker_context
 
-proc ensureDistinctType(rhs: NimNode): NimNode =
-  ## For PODs / aliases / externally-defined types, wrap in `distinct` unless
-  ## it's already distinct.
-  if rhs.kind == nnkDistinctTy:
-    return rhs
-  newTree(nnkDistinctTy, copyNimTree(rhs))
-
 macro EventBroker*(body: untyped): untyped =
   when defined(eventBrokerDebug):
     echo body.treeRepr
-  var typeIdent: NimNode = nil
-  var objectDef: NimNode = nil
-  var fieldNames: seq[NimNode] = @[]
-  var fieldTypes: seq[NimNode] = @[]
-  var hasInlineFields = false
-  for stmt in body:
-    if stmt.kind == nnkTypeSection:
-      for def in stmt:
-        if def.kind != nnkTypeDef:
-          continue
-        let rhs = def[2]
-        if not typeIdent.isNil():
-          error("Only one type may be declared inside EventBroker", def)
-        typeIdent = baseTypeIdent(def[0])
-
-        # Inline object/ref object definitions.
-        case rhs.kind
-        of nnkObjectTy:
-          let recList = rhs[2]
-          if recList.kind != nnkRecList:
-            error("EventBroker object must declare a standard field list", rhs)
-          var exportedRecList = newTree(nnkRecList)
-          for field in recList:
-            case field.kind
-            of nnkIdentDefs:
-              ensureFieldDef(field)
-              let fieldTypeNode = field[field.len - 2]
-              for i in 0 ..< field.len - 2:
-                let baseFieldIdent = baseTypeIdent(field[i])
-                fieldNames.add(copyNimTree(baseFieldIdent))
-                fieldTypes.add(copyNimTree(fieldTypeNode))
-              var cloned = copyNimTree(field)
-              for i in 0 ..< cloned.len - 2:
-                cloned[i] = exportIdentNode(cloned[i])
-              exportedRecList.add(cloned)
-            of nnkEmpty:
-              discard
-            else:
-              error(
-                "EventBroker object definition only supports simple field declarations",
-                field,
-              )
-          let exportedObjectType = newTree(
-            nnkObjectTy, copyNimTree(rhs[0]), copyNimTree(rhs[1]), exportedRecList
-          )
-          objectDef = exportedObjectType
-          hasInlineFields = true
-        of nnkRefTy:
-          if rhs.len != 1 or rhs[0].kind != nnkObjectTy:
-            error("EventBroker ref object must wrap a concrete object definition", rhs)
-          let obj = rhs[0]
-          let recList = obj[2]
-          if recList.kind != nnkRecList:
-            error("EventBroker object must declare a standard field list", obj)
-          var exportedRecList = newTree(nnkRecList)
-          for field in recList:
-            case field.kind
-            of nnkIdentDefs:
-              ensureFieldDef(field)
-              let fieldTypeNode = field[field.len - 2]
-              for i in 0 ..< field.len - 2:
-                let baseFieldIdent = baseTypeIdent(field[i])
-                fieldNames.add(copyNimTree(baseFieldIdent))
-                fieldTypes.add(copyNimTree(fieldTypeNode))
-              var cloned = copyNimTree(field)
-              for i in 0 ..< cloned.len - 2:
-                cloned[i] = exportIdentNode(cloned[i])
-              exportedRecList.add(cloned)
-            of nnkEmpty:
-              discard
-            else:
-              error(
-                "EventBroker object definition only supports simple field declarations",
-                field,
-              )
-          let exportedObjectType = newTree(
-            nnkObjectTy, copyNimTree(obj[0]), copyNimTree(obj[1]), exportedRecList
-          )
-          objectDef = newTree(nnkRefTy, exportedObjectType)
-          hasInlineFields = true
-        else:
-          # Native type / alias / externally-defined type.
-          # Ensure we create a unique event type by wrapping in `distinct` unless
-          # the user already did.
-          objectDef = ensureDistinctType(rhs)
-  if typeIdent.isNil():
-    error("EventBroker body must declare exactly one type", body)
+  let parsed = parseSingleTypeDef(body, "EventBroker", collectFieldInfo = true)
+  let typeIdent = parsed.typeIdent
+  let objectDef = parsed.objectDef
+  let fieldNames = parsed.fieldNames
+  let fieldTypes = parsed.fieldTypes
+  let hasInlineFields = parsed.hasInlineFields
 
   let exportedTypeIdent = postfix(copyNimTree(typeIdent), "*")
   let sanitized = sanitizeIdentName(typeIdent)

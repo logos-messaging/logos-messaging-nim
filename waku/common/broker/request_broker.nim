@@ -206,23 +206,6 @@ proc isReturnTypeValid(returnType, typeIdent: NimNode, mode: RequestBrokerMode):
   of rbSync:
     isSyncReturnTypeValid(returnType, typeIdent)
 
-proc cloneParams(params: seq[NimNode]): seq[NimNode] =
-  ## Deep copy parameter definitions so they can be inserted in multiple places.
-  result = @[]
-  for param in params:
-    result.add(copyNimTree(param))
-
-proc collectParamNames(params: seq[NimNode]): seq[NimNode] =
-  ## Extract all identifier symbols declared across IdentDefs nodes.
-  result = @[]
-  for param in params:
-    assert param.kind == nnkIdentDefs
-    for i in 0 ..< param.len - 2:
-      let nameNode = param[i]
-      if nameNode.kind == nnkEmpty:
-        continue
-      result.add(ident($nameNode))
-
 proc makeProcType(
     returnType: NimNode, params: seq[NimNode], mode: RequestBrokerMode
 ): NimNode =
@@ -253,92 +236,13 @@ proc parseMode(modeNode: NimNode): RequestBrokerMode =
   else:
     error("RequestBroker mode must be `sync` or `async` (default is async)", modeNode)
 
-proc ensureDistinctType(rhs: NimNode): NimNode =
-  ## For PODs / aliases / externally-defined types, wrap in `distinct` unless
-  ## it's already distinct.
-  if rhs.kind == nnkDistinctTy:
-    return copyNimTree(rhs)
-  newTree(nnkDistinctTy, copyNimTree(rhs))
-
 proc generateRequestBroker(body: NimNode, mode: RequestBrokerMode): NimNode =
   when defined(requestBrokerDebug):
     echo body.treeRepr
     echo "RequestBroker mode: ", $mode
-  var typeIdent: NimNode = nil
-  var objectDef: NimNode = nil
-  for stmt in body:
-    if stmt.kind == nnkTypeSection:
-      for def in stmt:
-        if def.kind != nnkTypeDef:
-          continue
-        if not typeIdent.isNil():
-          error("Only one type may be declared inside RequestBroker", def)
-
-        typeIdent = baseTypeIdent(def[0])
-        let rhs = def[2]
-
-        ## Support inline object types (fields are auto-exported)
-        ## AND non-object types / aliases (e.g. `string`, `int`, `OtherType`).
-        case rhs.kind
-        of nnkObjectTy:
-          let recList = rhs[2]
-          if recList.kind != nnkRecList:
-            error("RequestBroker object must declare a standard field list", rhs)
-          var exportedRecList = newTree(nnkRecList)
-          for field in recList:
-            case field.kind
-            of nnkIdentDefs:
-              ensureFieldDef(field)
-              var cloned = copyNimTree(field)
-              for i in 0 ..< cloned.len - 2:
-                cloned[i] = exportIdentNode(cloned[i])
-              exportedRecList.add(cloned)
-            of nnkEmpty:
-              discard
-            else:
-              error(
-                "RequestBroker object definition only supports simple field declarations",
-                field,
-              )
-          objectDef = newTree(
-            nnkObjectTy, copyNimTree(rhs[0]), copyNimTree(rhs[1]), exportedRecList
-          )
-        of nnkRefTy:
-          if rhs.len != 1:
-            error("RequestBroker ref type must have a single base", rhs)
-          if rhs[0].kind == nnkObjectTy:
-            let obj = rhs[0]
-            let recList = obj[2]
-            if recList.kind != nnkRecList:
-              error("RequestBroker object must declare a standard field list", obj)
-            var exportedRecList = newTree(nnkRecList)
-            for field in recList:
-              case field.kind
-              of nnkIdentDefs:
-                ensureFieldDef(field)
-                var cloned = copyNimTree(field)
-                for i in 0 ..< cloned.len - 2:
-                  cloned[i] = exportIdentNode(cloned[i])
-                exportedRecList.add(cloned)
-              of nnkEmpty:
-                discard
-              else:
-                error(
-                  "RequestBroker object definition only supports simple field declarations",
-                  field,
-                )
-            let exportedObjectType = newTree(
-              nnkObjectTy, copyNimTree(obj[0]), copyNimTree(obj[1]), exportedRecList
-            )
-            objectDef = newTree(nnkRefTy, exportedObjectType)
-          else:
-            ## `ref SomeType` (SomeType can be defined elsewhere)
-            objectDef = ensureDistinctType(rhs)
-        else:
-          ## Non-object type / alias (e.g. `string`, `int`, `SomeExternalType`).
-          objectDef = ensureDistinctType(rhs)
-  if typeIdent.isNil():
-    error("RequestBroker body must declare exactly one type", body)
+  let parsed = parseSingleTypeDef(body, "RequestBroker", allowRefToNonObject = true)
+  let typeIdent = parsed.typeIdent
+  let objectDef = parsed.objectDef
 
   when defined(requestBrokerDebug):
     echo "RequestBroker generating type: ", $typeIdent

@@ -122,23 +122,6 @@ proc isReturnTypeValid(returnType, typeIdent: NimNode): bool =
     return false
   inner[2].kind == nnkIdent and inner[2].eqIdent("string")
 
-proc cloneParams(params: seq[NimNode]): seq[NimNode] =
-  ## Deep copy parameter definitions so they can be reused in generated nodes.
-  result = @[]
-  for param in params:
-    result.add(copyNimTree(param))
-
-proc collectParamNames(params: seq[NimNode]): seq[NimNode] =
-  ## Extract identifiers declared in parameter definitions.
-  result = @[]
-  for param in params:
-    assert param.kind == nnkIdentDefs
-    for i in 0 ..< param.len - 2:
-      let nameNode = param[i]
-      if nameNode.kind == nnkEmpty:
-        continue
-      result.add(ident($nameNode))
-
 proc makeProcType(returnType: NimNode, params: seq[NimNode]): NimNode =
   var formal = newTree(nnkFormalParams)
   formal.add(returnType)
@@ -150,105 +133,13 @@ proc makeProcType(returnType: NimNode, params: seq[NimNode]): NimNode =
 
   newTree(nnkProcTy, formal, pragmas)
 
-proc ensureDistinctType(rhs: NimNode): NimNode =
-  ## For PODs / aliases / externally-defined types, wrap in `distinct` unless
-  ## it's already distinct.
-  if rhs.kind == nnkDistinctTy:
-    return copyNimTree(rhs)
-  newTree(nnkDistinctTy, copyNimTree(rhs))
-
 macro MultiRequestBroker*(body: untyped): untyped =
   when defined(requestBrokerDebug):
     echo body.treeRepr
-  var typeIdent: NimNode = nil
-  var objectDef: NimNode = nil
-  var isRefObject = false
-  for stmt in body:
-    if stmt.kind == nnkTypeSection:
-      for def in stmt:
-        if def.kind != nnkTypeDef:
-          continue
-        if not typeIdent.isNil():
-          error("Only one type may be declared inside MultiRequestBroker", def)
-
-        typeIdent = baseTypeIdent(def[0])
-        let rhs = def[2]
-
-        case rhs.kind
-        of nnkObjectTy:
-          let objectType = rhs
-          let recList = objectType[2]
-          if recList.kind != nnkRecList:
-            error(
-              "MultiRequestBroker object must declare a standard field list", objectType
-            )
-          var exportedRecList = newTree(nnkRecList)
-          for field in recList:
-            case field.kind
-            of nnkIdentDefs:
-              ensureFieldDef(field)
-              var cloned = copyNimTree(field)
-              for i in 0 ..< cloned.len - 2:
-                cloned[i] = exportIdentNode(cloned[i])
-              exportedRecList.add(cloned)
-            of nnkEmpty:
-              discard
-            else:
-              error(
-                "MultiRequestBroker object definition only supports simple field declarations",
-                field,
-              )
-          objectDef = newTree(
-            nnkObjectTy,
-            copyNimTree(objectType[0]),
-            copyNimTree(objectType[1]),
-            exportedRecList,
-          )
-        of nnkRefTy:
-          isRefObject = true
-          if rhs.len != 1 or rhs[0].kind != nnkObjectTy:
-            error(
-              "MultiRequestBroker ref object must wrap a concrete object definition",
-              rhs,
-            )
-          let objectType = rhs[0]
-          let recList = objectType[2]
-          if recList.kind != nnkRecList:
-            error(
-              "MultiRequestBroker object must declare a standard field list", objectType
-            )
-          var exportedRecList = newTree(nnkRecList)
-          for field in recList:
-            case field.kind
-            of nnkIdentDefs:
-              ensureFieldDef(field)
-              var cloned = copyNimTree(field)
-              for i in 0 ..< cloned.len - 2:
-                cloned[i] = exportIdentNode(cloned[i])
-              exportedRecList.add(cloned)
-            of nnkEmpty:
-              discard
-            else:
-              error(
-                "MultiRequestBroker object definition only supports simple field declarations",
-                field,
-              )
-          let exportedObjectType = newTree(
-            nnkObjectTy,
-            copyNimTree(objectType[0]),
-            copyNimTree(objectType[1]),
-            exportedRecList,
-          )
-          objectDef = newTree(nnkRefTy, exportedObjectType)
-        else:
-          # Native type / alias / externally-defined type.
-          # Ensure we create a unique request type by wrapping in `distinct` unless
-          # the user already did.
-          objectDef = ensureDistinctType(rhs)
-          isRefObject = false
-
-  if typeIdent.isNil():
-    error("MultiRequestBroker body must declare exactly one type", body)
+  let parsed = parseSingleTypeDef(body, "MultiRequestBroker")
+  let typeIdent = parsed.typeIdent
+  let objectDef = parsed.objectDef
+  let isRefObject = parsed.isRefObject
 
   when defined(requestBrokerDebug):
     echo "MultiRequestBroker generating type: ", $typeIdent

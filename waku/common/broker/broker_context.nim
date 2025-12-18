@@ -11,7 +11,7 @@ const DefaultBrokerContext* = BrokerContext(0xCAFFE14E'u32)
 
 var gContextCounter: Atomic[uint32]
 
-proc NewBrokerContext*(): BrokerContext =
+proc newBrokerContext*(): BrokerContext =
   var nextId = gContextCounter.fetchAdd(1, moRelaxed)
   if nextId == uint32(DefaultBrokerContext):
     nextId = gContextCounter.fetchAdd(1, moRelaxed)

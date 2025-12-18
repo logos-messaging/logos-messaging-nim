@@ -163,10 +163,17 @@ proc toLeaves*(rateCommitments: seq[RateCommitment]): RlnRelayResult[seq[seq[byt
     leaves.add(leaf)
   return ok(leaves)
 
-proc extractMetadata*(proof: RateLimitProof): RlnRelayResult[ProofMetadata] =
-  let epochHash = keccak.keccak256.digest(@(proof.epoch))
-  let rlnIdentifierHash = keccak.keccak256.digest(@(proof.rlnIdentifier))
+proc generateExternalNullifier*(
+    epoch: Epoch, rlnIdentifier: RlnIdentifier
+): RlnRelayResult[ExternalNullifier] =
+  let epochHash = keccak.keccak256.digest(@(epoch))
+  let rlnIdentifierHash = keccak.keccak256.digest(@(rlnIdentifier))
   let externalNullifier = poseidon(@[@(epochHash), @(rlnIdentifierHash)]).valueOr:
+    return err("Failed to compute external nullifier: " & error)
+  return ok(externalNullifier)
+
+proc extractMetadata*(proof: RateLimitProof): RlnRelayResult[ProofMetadata] =
+  let externalNullifier = generateExternalNullifier(proof.epoch, proof.rlnIdentifier).valueOr:
     return err("Failed to compute external nullifier: " & error)
   return ok(
     ProofMetadata(

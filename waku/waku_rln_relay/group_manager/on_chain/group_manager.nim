@@ -214,6 +214,8 @@ method register*(
   except Exception as e:
     return err("Failed to call register callback: " & e.msg)
 
+  return ok()
+
 method register*(
     g: OnchainGroupManager,
     identityCredential: IdentityCredential,
@@ -282,11 +284,9 @@ method register*(
   debug "ts receipt", receipt = tsReceipt[]
 
   if tsReceipt.status.isNone():
-    raise newException(ValueError, "Transaction failed: status is None")
+    return err("Transaction failed: status is None")
   if tsReceipt.status.get() != 1.Quantity:
-    raise newException(
-      ValueError, "Transaction failed with status: " & $tsReceipt.status.get()
-    )
+    return err("Transaction failed with status: " & $tsReceipt.status.get())
 
   ## Search through all transaction logs to find the MembershipRegistered event
   let expectedEventSignature = cast[FixedBytes[32]](keccak.keccak256.digest(
@@ -300,9 +300,7 @@ method register*(
       break
 
   if membershipRegisteredLog.isNone():
-    raise newException(
-      ValueError, "register: MembershipRegistered event not found in transaction logs"
-    )
+    return err("register: MembershipRegistered event not found in transaction logs")
 
   let registrationLog = membershipRegisteredLog.get()
 
@@ -336,13 +334,23 @@ method register*(
 
 method withdraw*(
     g: OnchainGroupManager, idCommitment: IDCommitment
-): Future[void] {.async: (raises: [Exception]).} =
-  initializedGuard(g) # TODO: after slashing is enabled on the contract
+): Future[Result[void, string]] {.async.} =
+  try:
+    initializedGuard(g)
+  except CatchableError as e:
+    return err("Not initialized: " & e.msg)
+
+  return ok()
 
 method withdrawBatch*(
     g: OnchainGroupManager, idCommitments: seq[IDCommitment]
-): Future[void] {.async: (raises: [Exception]).} =
-  initializedGuard(g)
+): Future[Result[void, string]] {.async.} =
+  try:
+    initializedGuard(g)
+  except CatchableError as e:
+    return err("Not initialized: " & e.msg)
+
+  return ok()
 
 proc getRootFromProofAndIndex(
     g: OnchainGroupManager, elements: seq[byte], bits: seq[byte]

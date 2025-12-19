@@ -68,7 +68,7 @@ type WakuRLNRelay* = ref object of RootObj
   onFatalErrorAction*: OnFatalErrorHandler
   nonceManager*: NonceManager
   epochMonitorFuture*: Future[void]
-  rootChangesFuture*: Future[void]
+  rootChangesFuture*: Future[Result[void, string]]
   brokerCtx*: BrokerContext
 
 proc calcEpoch*(rlnPeer: WakuRLNRelay, t: float64): Epoch =

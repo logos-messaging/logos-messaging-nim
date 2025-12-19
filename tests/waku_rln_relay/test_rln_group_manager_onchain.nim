@@ -87,7 +87,8 @@ suite "Onchain group manager":
     let merkleRootBefore = waitFor manager.fetchMerkleRoot()
 
     (waitFor manager.register(credentials, UserMessageLimit(20))).isOkOr:
-      raiseAssert "Failed to register: " & error
+      assert false,
+        "error returned when calling register: " & error
 
     discard waitFor withTimeout(trackRootChanges(manager), 15.seconds)
 
@@ -111,7 +112,7 @@ suite "Onchain group manager":
     for i in 0 ..< credentials.len():
       info "Registering credential", index = i, credential = credentials[i]
       (waitFor manager.register(credentials[i], UserMessageLimit(20))).isOkOr:
-        raiseAssert "Failed to register credential " & $i & ": " & error
+        assert false, "Failed to register credential " & $i & ": " & error
       discard waitFor manager.updateRoots()
 
     let merkleRootAfter = waitFor manager.fetchMerkleRoot()
@@ -143,7 +144,7 @@ suite "Onchain group manager":
 
     (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
       assert false,
-        "exception raised when calling register: " & getCurrentExceptionMsg()
+        "error returned when calling register: " & error
 
     let merkleRootAfter = waitFor manager.fetchMerkleRoot()
 
@@ -170,26 +171,24 @@ suite "Onchain group manager":
 
     manager.onRegister(callback)
 
-    try:
-      waitFor manager.register(
-        RateCommitment(
-          idCommitment: idCommitment, userMessageLimit: UserMessageLimit(20)
-        )
+    (waitFor manager.register(
+      RateCommitment(
+        idCommitment: idCommitment, userMessageLimit: UserMessageLimit(20)
       )
-    except Exception, CatchableError:
-      assert false, "exception raised: " & getCurrentExceptionMsg()
+    )).isOkOr:
+      assert false,
+        "error returned when calling register: " & error
 
     waitFor fut
 
   test "withdraw: should guard against uninitialized state":
     let idSecretHash = generateCredentials().idSecretHash
 
-    try:
-      waitFor manager.withdraw(idSecretHash)
-    except CatchableError:
-      assert true
-    except Exception:
-      assert false, "exception raised: " & getCurrentExceptionMsg()
+    let res = waitFor manager.withdraw(idSecretHash)
+
+    check:
+      res.isErr()
+      res.error == "Not initialized: OnchainGroupManager is not initialized"
 
   test "validateRoot: should validate good root":
     let idCredentials = generateCredentials()
@@ -210,10 +209,8 @@ suite "Onchain group manager":
     (waitFor manager.init()).isOkOr:
       raiseAssert $error
 
-    try:
-      waitFor manager.register(idCredentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false, "exception raised: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
+      assert false, "error returned : " & getCurrentExceptionMsg()
 
     waitFor fut
 
@@ -292,10 +289,10 @@ suite "Onchain group manager":
 
     manager.onRegister(callback)
 
-    try:
-      waitFor manager.register(credentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false, "exception raised: " & getCurrentExceptionMsg()
+
+    (waitFor manager.register(credentials, UserMessageLimit(20))).isOkOr:
+      assert false,
+        "error returned when calling register: " & error
     waitFor fut
 
     let rootUpdated = waitFor manager.updateRoots()
@@ -330,11 +327,9 @@ suite "Onchain group manager":
 
     let idCredential = generateCredentials()
 
-    try:
-      waitFor manager.register(idCredential, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false,
-        "exception raised when calling startGroupSync: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredential, UserMessageLimit(20))).isOkOr:
+       assert false,
+        "error returned when calling register: " & error
 
     let messageBytes = "Hello".toBytes()
 
@@ -388,14 +383,12 @@ suite "Onchain group manager":
 
       return callback
 
-    try:
-      manager.onRegister(generateCallback(futures, credentials))
+    manager.onRegister(generateCallback(futures, credentials))
 
-      for i in 0 ..< credentials.len():
-        waitFor manager.register(credentials[i], UserMessageLimit(20))
-        discard waitFor manager.updateRoots()
-    except Exception, CatchableError:
-      assert false, "exception raised: " & getCurrentExceptionMsg()
+    for i in 0 ..< credentials.len():
+      (waitFor manager.register(credentials[i], UserMessageLimit(20))).isOkOr:
+        assert false, "Failed to register credential " & $i & ": " & error
+      discard waitFor manager.updateRoots()
 
     waitFor allFutures(futures)
 

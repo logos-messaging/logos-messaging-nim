@@ -186,6 +186,6 @@
 	branch = master
 [submodule "vendor/nim-ffi"]
 	path = vendor/nim-ffi
-	url = https://github.com/waku-org/nim-ffi/
+	url = https://github.com/logos-messaging/nim-ffi/
 	ignore = untracked
 	branch = master

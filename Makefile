@@ -119,6 +119,10 @@ endif
 ##################
 .PHONY: deps libbacktrace
 
+FOUNDRY_VERSION := 1.5.0
+PNPM_VERSION := 10.23.0
+
+
 rustup:
 ifeq (, $(shell which cargo))
 # Install Rustup if it's not installed
@@ -128,7 +132,7 @@ ifeq (, $(shell which cargo))
 endif
 
 rln-deps: rustup
-	./scripts/install_rln_tests_dependencies.sh
+	./scripts/install_rln_tests_dependencies.sh $(FOUNDRY_VERSION) $(PNPM_VERSION)
 
 deps: | deps-common nat-libs waku.nims
 

@@ -255,7 +255,7 @@ proc buildMobileIOS(srcDir = ".", params = "") =
     mkDir vendorObjDir
 
   let clangBase = "clang -arch " & iosArch & " -isysroot " & sdkPath &
-      " -mios-version-min=14.0 -fembed-bitcode -fPIC -O2"
+      " -mios-version-min=18.0 -fembed-bitcode -fPIC -O2"
 
   # Generate C sources from Nim (no linking)
   exec "nim c" &

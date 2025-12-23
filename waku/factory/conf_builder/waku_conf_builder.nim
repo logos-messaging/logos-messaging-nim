@@ -248,9 +248,6 @@ proc withAgentString*(b: var WakuConfBuilder, agentString: string) =
 proc withColocationLimit*(b: var WakuConfBuilder, colocationLimit: int) =
   b.colocationLimit = some(colocationLimit)
 
-proc withMaxRelayPeers*(b: var WakuConfBuilder, maxRelayPeers: int) =
-  b.maxRelayPeers = some(maxRelayPeers)
-
 proc withRelayServiceRatio*(b: var WakuConfBuilder, relayServiceRatio: string) =
   b.relayServiceRatio = some(relayServiceRatio)
 
@@ -588,12 +585,10 @@ proc build*(
       warn "Peer persistence not specified, defaulting to false"
       false
 
-  let maxConnections =
-    if builder.maxConnections.isSome():
-      builder.maxConnections.get()
-    else:
-      warn "Max Connections was not specified, defaulting to 300"
-      300
+  let maxConnections = builder.maxConnections.get()
+  if maxConnections < 150:
+    warn "max-connections less than 150; we suggest using 150 or more for better connectivity",
+      provided = maxConnections
 
   # TODO: Do the git version thing here
   let agentString = builder.agentString.get("nwaku")
@@ -663,7 +658,7 @@ proc build*(
     agentString: agentString,
     colocationLimit: colocationLimit,
     maxRelayPeers: builder.maxRelayPeers,
-    relayServiceRatio: builder.relayServiceRatio.get("60:40"),
+    relayServiceRatio: builder.relayServiceRatio.get("50:50"),
     rateLimit: rateLimit,
     circuitRelayClient: builder.circuitRelayClient.get(false),
     staticNodes: builder.staticNodes,

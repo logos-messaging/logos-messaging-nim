@@ -1041,7 +1041,7 @@ proc new*(
     wakuMetadata: WakuMetadata = nil,
     maxRelayPeers: Option[int] = none(int),
     maxServicePeers: Option[int] = none(int),
-    relayServiceRatio: string = "60:40",
+    relayServiceRatio: string = "50:50",
     storage: PeerStorage = nil,
     initialBackoffInSec = InitialBackoffInSec,
     backoffFactor = BackoffFactor,

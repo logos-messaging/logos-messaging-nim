@@ -529,6 +529,7 @@ proc runAnvil*(
   # --chain-id                        Chain ID of the network.
   # --load-state                      Initialize the chain from a previously saved state snapshot (read-only)
   # --dump-state                      Dump the state on exit to the given file (write-only)
+  # Values used are representative of Linea Sepolia testnet
   # See anvil documentation https://book.getfoundry.sh/reference/anvil/ for more details
   try:
     let anvilPath = getAnvilPath()
@@ -539,11 +540,16 @@ proc runAnvil*(
         "--port",
         $port,
         "--gas-limit",
-        "300000000000000",
+        "30000000",
+        "--gas-price",
+        "7",
+        "--base-fee",
+        "7",
         "--balance",
-        "1000000000",
+        "10000000000",
         "--chain-id",
         $chainId,
+        "--disable-min-priority-fee"
       ]
 
     # Add state file argument if provided

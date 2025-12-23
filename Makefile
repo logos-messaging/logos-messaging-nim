@@ -119,6 +119,10 @@ endif
 ##################
 .PHONY: deps libbacktrace
 
+FOUNDRY_VERSION := 1.5.0
+PNPM_VERSION := 10.23.0
+
+
 rustup:
 ifeq (, $(shell which cargo))
 # Install Rustup if it's not installed
@@ -128,7 +132,7 @@ ifeq (, $(shell which cargo))
 endif
 
 rln-deps: rustup
-	./scripts/install_rln_tests_dependencies.sh
+	./scripts/install_rln_tests_dependencies.sh $(FOUNDRY_VERSION) $(PNPM_VERSION)
 
 deps: | deps-common nat-libs waku.nims
 
@@ -426,18 +430,27 @@ docker-liteprotocoltester-push:
 .PHONY: cbindings cwaku_example libwaku
 
 STATIC ?= 0
+BUILD_COMMAND ?= libwakuDynamic
+
+ifeq ($(detected_OS),Windows)
+	LIB_EXT_DYNAMIC = dll
+	LIB_EXT_STATIC = lib
+else ifeq ($(detected_OS),Darwin)
+	LIB_EXT_DYNAMIC = dylib
+	LIB_EXT_STATIC = a
+else ifeq ($(detected_OS),Linux)
+	LIB_EXT_DYNAMIC = so
+	LIB_EXT_STATIC = a
+endif
+
+LIB_EXT := $(LIB_EXT_DYNAMIC)
+ifeq ($(STATIC), 1)
+	LIB_EXT = $(LIB_EXT_STATIC)
+	BUILD_COMMAND = libwakuStatic
+endif
 
 libwaku: | build deps librln
-	rm -f build/libwaku*
-
-ifeq ($(STATIC), 1)
-	echo -e $(BUILD_MSG) "build/$@.a" && $(ENV_SCRIPT) nim libwakuStatic $(NIM_PARAMS) waku.nims
-else ifeq ($(detected_OS),Windows)
-	make -f scripts/libwaku_windows_setup.mk windows-setup
-	echo -e $(BUILD_MSG) "build/$@.dll" && $(ENV_SCRIPT) nim libwakuDynamic $(NIM_PARAMS) waku.nims
-else
-	echo -e $(BUILD_MSG) "build/$@.so" && $(ENV_SCRIPT) nim libwakuDynamic $(NIM_PARAMS) waku.nims
-endif
+	echo -e $(BUILD_MSG) "build/$@.$(LIB_EXT)" && $(ENV_SCRIPT) nim $(BUILD_COMMAND) $(NIM_PARAMS) waku.nims $@.$(LIB_EXT)
 
 #####################
 ## Mobile Bindings ##
@@ -504,6 +517,51 @@ libwaku-android:
 # It's likely this architecture is not used so we might just not support it.
 #	$(MAKE) libwaku-android-arm
 
+#################
+## iOS Bindings #
+#################
+.PHONY: libwaku-ios-precheck \
+				libwaku-ios-device \
+				libwaku-ios-simulator \
+				libwaku-ios
+
+IOS_DEPLOYMENT_TARGET ?= 18.0
+
+# Get SDK paths dynamically using xcrun
+define get_ios_sdk_path
+$(shell xcrun --sdk $(1) --show-sdk-path 2>/dev/null)
+endef
+
+libwaku-ios-precheck:
+ifeq ($(detected_OS),Darwin)
+	@command -v xcrun >/dev/null 2>&1 || { echo "Error: Xcode command line tools not installed"; exit 1; }
+else
+	$(error iOS builds are only supported on macOS)
+endif
+
+# Build for iOS architecture 
+build-libwaku-for-ios-arch:
+	IOS_SDK=$(IOS_SDK) IOS_ARCH=$(IOS_ARCH) IOS_SDK_PATH=$(IOS_SDK_PATH) $(ENV_SCRIPT) nim libWakuIOS $(NIM_PARAMS) waku.nims
+
+# iOS device (arm64)
+libwaku-ios-device: IOS_ARCH=arm64
+libwaku-ios-device: IOS_SDK=iphoneos
+libwaku-ios-device: IOS_SDK_PATH=$(call get_ios_sdk_path,iphoneos)
+libwaku-ios-device: | libwaku-ios-precheck build deps
+	$(MAKE) build-libwaku-for-ios-arch IOS_ARCH=$(IOS_ARCH) IOS_SDK=$(IOS_SDK) IOS_SDK_PATH=$(IOS_SDK_PATH)
+
+# iOS simulator (arm64 - Apple Silicon Macs)
+libwaku-ios-simulator: IOS_ARCH=arm64
+libwaku-ios-simulator: IOS_SDK=iphonesimulator
+libwaku-ios-simulator: IOS_SDK_PATH=$(call get_ios_sdk_path,iphonesimulator)
+libwaku-ios-simulator: | libwaku-ios-precheck build deps
+	$(MAKE) build-libwaku-for-ios-arch IOS_ARCH=$(IOS_ARCH) IOS_SDK=$(IOS_SDK) IOS_SDK_PATH=$(IOS_SDK_PATH)
+
+# Build all iOS targets
+libwaku-ios:
+	$(MAKE) libwaku-ios-device
+	$(MAKE) libwaku-ios-simulator
+
 cwaku_example: | build libwaku
 	echo -e $(BUILD_MSG) "build/$@" && \
 		cc -o "build/$@" \
@@ -549,4 +607,3 @@ release-notes:
 			sed -E 's@#([0-9]+)@[#\1](https://github.com/waku-org/nwaku/issues/\1)@g'
 # I could not get the tool to replace issue ids with links, so using sed for now,
 # asked here: https://github.com/bvieira/sv4git/discussions/101
-

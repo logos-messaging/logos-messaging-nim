@@ -31,6 +31,8 @@ requires "nim >= 2.2.4",
   "results",
   "db_connector",
   "minilru",
+  "lsquic",
+  "jwt",
   "ffi"
 
 ### Helper functions
@@ -148,7 +150,8 @@ task chat2, "Build example Waku chat usage":
   let name = "chat2"
   buildBinary name,
     "apps/chat2/",
-    "-d:chronicles_sinks=textlines[file] -d:ssl -d:chronicles_log_level='TRACE' "
+    "-d:chronicles_sinks=textlines[file] -d:chronicles_log_level='TRACE' "
+  #  -d:ssl - cause unlisted exception error in libp2p/utility...
 
 task chat2mix, "Build example Waku chat mix usage":
   # NOTE For debugging, set debug level. For chat usage we want minimal log
@@ -158,7 +161,8 @@ task chat2mix, "Build example Waku chat mix usage":
   let name = "chat2mix"
   buildBinary name,
     "apps/chat2mix/",
-    "-d:chronicles_sinks=textlines[file] -d:ssl -d:chronicles_log_level='TRACE' "
+    "-d:chronicles_sinks=textlines[file] -d:chronicles_log_level='TRACE' "
+  #  -d:ssl - cause unlisted exception error in libp2p/utility...
 
 task chat2bridge, "Build chat2bridge":
   let name = "chat2bridge"

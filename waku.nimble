@@ -12,28 +12,51 @@ license = "MIT or Apache License 2.0"
 
 ### Dependencies
 requires "nim >= 2.2.4",
-  "chronicles",
-  "confutils",
-  "chronos",
-  "dnsdisc",
-  "eth",
-  "json_rpc",
-  "libbacktrace",
-  "nimcrypto",
-  "serialization",
-  "stew",
-  "stint",
-  "metrics",
-  "libp2p >= 1.14.3",
-  "web3",
-  "presto",
-  "regex",
-  "results",
-  "db_connector",
-  "minilru",
-  "ffi"
+  "https://github.com/status-im/nim-chronicles.git#54f5b726025e8c7385e3a6529d3aa27454c6e6ff",
+  "https://github.com/status-im/nim-confutils.git#e214b3992a31acece6a9aada7d0a1ad37c928f3b",
+  "https://github.com/status-im/nim-chronos.git#0646c444fce7c7ed08ef6f2c9a7abfd172ffe655",
+  "https://github.com/status-im/nim-dnsdisc.git#b71d029f4da4ec56974d54c04518bada00e1b623",
+  "https://github.com/status-im/nim-eth.git#d9135e6c3c5d6d819afdfb566aa8d958756b73a8",
+  "https://github.com/status-im/nim-json-rpc.git#9665c265035f49f5ff94bbffdeadde68e19d6221",
+  "https://github.com/status-im/nim-libbacktrace.git#d8bd4ce5c46bb6d2f984f6b3f3d7380897d95ecb",
+  "https://github.com/cheatfate/nimcrypto.git#721fb99ee099b632eb86dfad1f0d96ee87583774",
+  "https://github.com/status-im/nim-serialization.git#6f525d5447d97256750ca7856faead03e562ed20",
+  "https://github.com/status-im/nim-toml-serialization.git#fea85b27f0badcf617033ca1bc05444b5fd8aa7a",
+  "https://github.com/status-im/nim-stew.git#e5740014961438610d336cd81706582dbf2c96f0",
+  "https://github.com/status-im/nim-stint.git#470b7892561b5179ab20bd389a69217d6213fe58",
+  "https://github.com/status-im/nim-metrics.git#ecf64c6078d1276d3b7d9b3d931fbdb70004db11",
+  "https://github.com/vacp2p/nim-libp2p.git#e82080f7b1aa61c6d35fa5311b873f41eff4bb52",
+  "https://github.com/status-im/nim-web3.git#81ee8ce479d86acb73be7c4f365328e238d9b4a3",
+  "https://github.com/status-im/nim-presto.git#92b1c7ff141e6920e1f8a98a14c35c1fa098e3be",
+  "https://github.com/nitely/nim-regex.git#4593305ed1e49731fc75af1dc572dd2559aad19c",
+  "https://github.com/arnetheduck/nim-results.git#df8113dda4c2d74d460a8fa98252b0b771bf1f27",
+  "https://github.com/nim-lang/db_connector.git#74aef399e5c232f95c9fc5c987cebac846f09d62",
+  "https://github.com/status-im/nim-minilru.git#0c4b2bce959591f0a862e9b541ba43c6d0cf3476",
+  "https://github.com/status-im/nim-unittest2.git#8b51e99b4a57fcfb31689230e75595f024543024",
+  "https://github.com/status-im/nim-testutils.git#94d68e796c045d5b37cabc6be32d7bfa168f8857",
+  "https://github.com/status-im/nim-bearssl.git#11e798b62b8e6beabe958e048e9e24c7e0f9ee63",
+  "https://github.com/status-im/nim-secp256k1.git#9dd3df62124aae79d564da636bb22627c53c7676",
+  "https://github.com/status-im/nim-nat-traversal.git#860e18c37667b5dd005b94c63264560c35d88004",
+  "https://github.com/status-im/nim-faststreams.git#c3ac3f639ed1d62f59d3077d376a29c63ac9750c",
+  "https://github.com/status-im/nim-http-utils.git#79cbab1460f4c0cdde2084589d017c43a3d7b4f1",
+  "https://github.com/status-im/nim-json-serialization.git#b65fd6a7e64c864dabe40e7dfd6c7d07db0014ac",
+  "https://github.com/status-im/nim-websock.git#ebe308a79a7b440a11dfbe74f352be86a3883508",
+  "https://github.com/status-im/nim-zlib.git#daa8723fd32299d4ca621c837430c29a5a11e19a",
+  "https://github.com/arnetheduck/nim-sqlite3-abi.git#bdf01cf4236fb40788f0733466cdf6708783cbac",
+  "https://github.com/status-im/nim-taskpools.git#9e8ccc754631ac55ac2fd495e167e74e86293edb",
+  "https://github.com/nitely/nim-unicodedb.git#66f2458710dc641dd4640368f9483c8a0ec70561",
+  "https://github.com/ba0f3/dnsclient.nim.git#23214235d4784d24aceed99bbfe153379ea557c8"
 
 ### Helper functions
+
+# Get nimble package paths for compilation
+proc getNimblePkgDir(): string =
+  # Get nimble's package directory
+  when defined(windows):
+    getEnv("USERPROFILE") / ".nimble" / "pkgs2"
+  else:
+    getEnv("HOME") / ".nimble" / "pkgs2"
+
 proc buildModule(filePath, params = "", lang = "c"): bool =
   if not dirExists "build":
     mkDir "build"
@@ -55,12 +78,10 @@ proc buildModule(filePath, params = "", lang = "c"): bool =
 proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
-  var extra_params = params
-  for i in 2 ..< paramCount():
-    extra_params &= " " & paramStr(i)
-  exec "nim " & lang & " --out:build/" & name & " --mm:refc " & extra_params & " " &
-    srcDir & name & ".nim"
+  # Use nimble c command which automatically handles package paths
+  # Add vendor/nim-ffi explicitly since it's a submodule
+  let nimbleCmd = "nimble c --out:build/" & name & " --mm:refc --path:vendor/nim-ffi " & params & " " & srcDir & name & ".nim"
+  exec nimbleCmd
 
 proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static") =
   if not dirExists "build":
@@ -217,6 +238,23 @@ task libWakuAndroid, "Build the mobile bindings for Android":
 ### Mobile iOS
 import std/sequtils
 
+# Helper to get nimble package path
+proc getNimblePkgPath(pkgName: string): string =
+  let (output, exitCode) = gorgeEx("nimble path " & pkgName)
+  if exitCode != 0:
+    quit "Error: Could not find nimble package: " & pkgName
+  result = output.strip()
+
+# Helper to get Nim lib path
+proc getNimLibPath(): string =
+  let (output, exitCode) = gorgeEx("nim --verbosity:0 --hints:off dump --dump.format:json 2>/dev/null | grep -o '\"libpath\":\"[^\"]*\"' | cut -d'\"' -f4")
+  if exitCode != 0 or output.strip().len == 0:
+    # Fallback: try to find it relative to nim binary
+    let (nimPath, _) = gorgeEx("which nim")
+    result = nimPath.strip().parentDir().parentDir() / "lib"
+  else:
+    result = output.strip()
+
 proc buildMobileIOS(srcDir = ".", params = "") =
   echo "Building iOS libwaku library"
 
@@ -265,12 +303,18 @@ proc buildMobileIOS(srcDir = ".", params = "") =
       " " & extra_params &
       " " & srcDir & "/libwaku.nim"
 
-  # Compile vendor C libraries for iOS
+  # Get nimble package paths
+  let bearSslPkgDir = getNimblePkgPath("bearssl")
+  let secp256k1PkgDir = getNimblePkgPath("secp256k1")
+  let natTraversalPkgDir = getNimblePkgPath("nat_traversal")
+  let nimLibDir = getNimLibPath()
+
+  # Compile C libraries for iOS
 
   # --- BearSSL ---
   echo "Compiling BearSSL for iOS..."
-  let bearSslSrcDir = "./vendor/nim-bearssl/bearssl/csources/src"
-  let bearSslIncDir = "./vendor/nim-bearssl/bearssl/csources/inc"
+  let bearSslSrcDir = bearSslPkgDir / "bearssl/csources/src"
+  let bearSslIncDir = bearSslPkgDir / "bearssl/csources/inc"
   for path in walkDirRec(bearSslSrcDir):
     if path.endsWith(".c"):
       let relPath = path.replace(bearSslSrcDir & "/", "").replace("/", "_")
@@ -281,7 +325,7 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- secp256k1 ---
   echo "Compiling secp256k1 for iOS..."
-  let secp256k1Dir = "./vendor/nim-secp256k1/vendor/secp256k1"
+  let secp256k1Dir = secp256k1PkgDir / "vendor/secp256k1"
   let secp256k1Flags = " -I" & secp256k1Dir & "/include" &
         " -I" & secp256k1Dir & "/src" &
         " -I" & secp256k1Dir &
@@ -306,9 +350,9 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- miniupnpc ---
   echo "Compiling miniupnpc for iOS..."
-  let miniupnpcSrcDir = "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/src"
-  let miniupnpcIncDir = "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/include"
-  let miniupnpcBuildDir = "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/build"
+  let miniupnpcSrcDir = natTraversalPkgDir / "vendor/miniupnp/miniupnpc/src"
+  let miniupnpcIncDir = natTraversalPkgDir / "vendor/miniupnp/miniupnpc/include"
+  let miniupnpcBuildDir = natTraversalPkgDir / "vendor/miniupnp/miniupnpc/build"
   let miniupnpcFiles = @[
     "addr_is_reserved.c", "connecthostport.c", "igd_desc_parse.c",
     "minisoap.c", "minissdpc.c", "miniupnpc.c", "miniwget.c",
@@ -329,7 +373,7 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- libnatpmp ---
   echo "Compiling libnatpmp for iOS..."
-  let natpmpSrcDir = "./vendor/nim-nat-traversal/vendor/libnatpmp-upstream"
+  let natpmpSrcDir = natTraversalPkgDir / "vendor/libnatpmp-upstream"
   # Only compile natpmp.c - getgateway.c uses net/route.h which is not available on iOS
   let natpmpObj = vendorObjDir / "natpmp_natpmp.o"
   if not fileExists(natpmpObj):
@@ -363,13 +407,13 @@ proc buildMobileIOS(srcDir = ".", params = "") =
     let oFile = objDir / baseName
     exec clangBase &
         " -DENABLE_STRNATPMPERR" &
-        " -I./vendor/nimbus-build-system/vendor/Nim/lib/" &
-        " -I./vendor/nim-bearssl/bearssl/csources/inc/" &
-        " -I./vendor/nim-bearssl/bearssl/csources/tools/" &
-        " -I./vendor/nim-bearssl/bearssl/abi/" &
-        " -I./vendor/nim-secp256k1/vendor/secp256k1/include/" &
-        " -I./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/include/" &
-        " -I./vendor/nim-nat-traversal/vendor/libnatpmp-upstream/" &
+        " -I" & nimLibDir & "/" &
+        " -I" & bearSslPkgDir & "/bearssl/csources/inc/" &
+        " -I" & bearSslPkgDir & "/bearssl/csources/tools/" &
+        " -I" & bearSslPkgDir & "/bearssl/abi/" &
+        " -I" & secp256k1PkgDir & "/vendor/secp256k1/include/" &
+        " -I" & natTraversalPkgDir & "/vendor/miniupnp/miniupnpc/include/" &
+        " -I" & natTraversalPkgDir & "/vendor/libnatpmp-upstream/" &
         " -I" & nimcacheDir &
         " -c " & cFile &
         " -o " & oFile

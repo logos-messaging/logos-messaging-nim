@@ -199,7 +199,7 @@ See the [separate tutorial](../docs/tutorial/dns-disc.md) for a complete guide t
 
 ## Enabling Websocket
 
-Websocket is currently the only Waku transport supported by browser nodes that uses [js-waku](https://github.com/status-im/js-waku).
+Websocket is currently the only Waku transport supported by browser nodes that uses [logos-messaging-js](https://github.com/logos-messaging/logos-messaging-js).
 Setting up websocket enables your node to directly serve browser peers.
 
 A valid certificate is necessary to serve browser nodes,

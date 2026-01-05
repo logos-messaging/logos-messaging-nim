@@ -127,7 +127,7 @@
 - Add extra debug REST helper via getting peer statistics ([#3443](https://github.com/waku-org/nwaku/issues/3443)) ([f4ad7a332](https://github.com/waku-org/nwaku/commit/f4ad7a332))
 - Expose online state in libwaku ([#3433](https://github.com/waku-org/nwaku/issues/3433)) ([e7f5c8cb2](https://github.com/waku-org/nwaku/commit/e7f5c8cb2))
 - Add heaptrack support build for Nim v2.0.12 builds ([#3424](https://github.com/waku-org/nwaku/issues/3424)) ([91885fb9e](https://github.com/waku-org/nwaku/commit/91885fb9e))
-- Remove debug for js-waku ([#3423](https://github.com/waku-org/nwaku/issues/3423)) ([5628dc6ad](https://github.com/waku-org/nwaku/commit/5628dc6ad))
+- Remove debug for logos-messaging-js ([#3423](https://github.com/waku-org/nwaku/issues/3423)) ([5628dc6ad](https://github.com/waku-org/nwaku/commit/5628dc6ad))
 - Bump dependencies for v0.36 ([#3410](https://github.com/waku-org/nwaku/issues/3410)) ([005815746](https://github.com/waku-org/nwaku/commit/005815746))
 - Enhance feedback on error CLI ([#3405](https://github.com/waku-org/nwaku/issues/3405)) ([3464d81a6](https://github.com/waku-org/nwaku/commit/3464d81a6))
 - Allow multiple rln eth clients ([#3402](https://github.com/waku-org/nwaku/issues/3402)) ([861710bc7](https://github.com/waku-org/nwaku/commit/861710bc7))
@@ -1327,7 +1327,7 @@ Release highlights:
 - Adding -d:postgres flag when creating a Docker image for release and PRs ([#2076](https://github.com/waku-org/nwaku/issues/2076)) ([7a376f59](https://github.com/waku-org/nwaku/commit/7a376f59))
 - Moved external APIs out of node ([#2069](https://github.com/waku-org/nwaku/issues/2069)) ([3e72e830](https://github.com/waku-org/nwaku/commit/3e72e830))
 - bump nim-libp2p, nim-toml-serialization, nim-unicodedb, nim-unittest2, nim-websock, nim-zlib, & nimbus-build-system ([#2065](https://github.com/waku-org/nwaku/issues/2065)) ([dc25057a](https://github.com/waku-org/nwaku/commit/dc25057a))
-- **ci:** add js-waku as a dependency for pre-release createion ([#2022](https://github.com/waku-org/nwaku/issues/2022)) ([28b04000](https://github.com/waku-org/nwaku/commit/28b04000))
+- **ci:** add logos-messaging-js as a dependency for pre-release createion ([#2022](https://github.com/waku-org/nwaku/issues/2022)) ([28b04000](https://github.com/waku-org/nwaku/commit/28b04000))
 - Updating nim-chronicles, nim-chronos, nim-presto, nimcrypto, nim-libp2p, and nim-nat-transversal ([#2043](https://github.com/waku-org/nwaku/issues/2043)) ([f617cd97](https://github.com/waku-org/nwaku/commit/f617cd97))
 - **cbindings:** Thread-safe communication between the main thread and the Waku Thread ([#1978](https://github.com/waku-org/nwaku/issues/1978)) ([72f90663](https://github.com/waku-org/nwaku/commit/72f90663))
 - **rln-relay:** logs, updated submodule, leaves_set metric ([#2024](https://github.com/waku-org/nwaku/issues/2024)) ([2e515a06](https://github.com/waku-org/nwaku/commit/2e515a06))
@@ -1335,7 +1335,7 @@ Release highlights:
 - **postgres:** not loading the libpq library by default & better user feedback ([#2028](https://github.com/waku-org/nwaku/issues/2028)) ([e8602021](https://github.com/waku-org/nwaku/commit/e8602021))
 - move SubscriptionManager under waku_core  ([#2025](https://github.com/waku-org/nwaku/issues/2025)) ([563b2b20](https://github.com/waku-org/nwaku/commit/563b2b20))
 - **README:** List possible WSL Issue ([#1995](https://github.com/waku-org/nwaku/issues/1995)) ([ebe715e9](https://github.com/waku-org/nwaku/commit/ebe715e9))
-- **ci:** add js-waku test to pre-release workflow ([#2017](https://github.com/waku-org/nwaku/issues/2017)) ([e8776fd6](https://github.com/waku-org/nwaku/commit/e8776fd6))
+- **ci:** add logos-messaging-js test to pre-release workflow ([#2017](https://github.com/waku-org/nwaku/issues/2017)) ([e8776fd6](https://github.com/waku-org/nwaku/commit/e8776fd6))
 
 This release supports the following [libp2p protocols](https://docs.libp2p.io/concepts/protocols/):
 | Protocol | Spec status | Protocol id |
@@ -1362,7 +1362,7 @@ The Waku v1 implementation has been removed from this repository and can be foun
 
 Release highlights:
 * RLN is now part of standard release (is no longer EXPERIMENTAL feature)
-* Interop tests between nwaku and js-waku are now gating PRs and releases
+* Interop tests between nwaku and logos-messaging-js are now gating PRs and releases
 * Libwaku has been made more threadsafe (1 out of 3 improvements applied.)
 * Added autosharding option on various protocol APIs
 
@@ -1412,9 +1412,9 @@ Release highlights:
 
 ### Changes
 
-- **ci:** add js-waku test to pre-release workflow ([#2017](https://github.com/waku-org/nwaku/issues/2017)) ([e8776fd6](https://github.com/waku-org/nwaku/commit/e8776fd6))
+- **ci:** add logos-messaging-js test to pre-release workflow ([#2017](https://github.com/waku-org/nwaku/issues/2017)) ([e8776fd6](https://github.com/waku-org/nwaku/commit/e8776fd6))
 - **rln-relay:** updated docs ([#1993](https://github.com/waku-org/nwaku/issues/1993)) ([76e34077](https://github.com/waku-org/nwaku/commit/76e34077))
-- **ci:** execute js-waku integration tests on image build ([#2006](https://github.com/waku-org/nwaku/issues/2006)) ([5d976df9](https://github.com/waku-org/nwaku/commit/5d976df9))
+- **ci:** execute logos-messaging-js integration tests on image build ([#2006](https://github.com/waku-org/nwaku/issues/2006)) ([5d976df9](https://github.com/waku-org/nwaku/commit/5d976df9))
 - **rln-relay:** add isReady check ([#1989](https://github.com/waku-org/nwaku/issues/1989)) ([5638bd06](https://github.com/waku-org/nwaku/commit/5638bd06))
 - **rln-relay:** clean up nullifier table every MaxEpochGap ([#1994](https://github.com/waku-org/nwaku/issues/1994)) ([483f40c8](https://github.com/waku-org/nwaku/commit/483f40c8))
 - **ci:** use commit instead of master for docker image ([#1990](https://github.com/waku-org/nwaku/issues/1990)) ([98850192](https://github.com/waku-org/nwaku/commit/98850192))

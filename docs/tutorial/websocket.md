@@ -3,7 +3,7 @@
 > TODO (2023-05-24): Deprecate or fix
 
 Currently, nim-waku only supports TCP transport.
-This means it is not possible to directly connect from a browser using [js-waku](https://github.com/waku-org/js-waku/)
+This means it is not possible to directly connect from a browser using [logos-messaging-js](https://github.com/logos-messaging/logos-messaging-js/)
 to a nim-waku based node such as wakunode2.
 
 To remediate to this, utilities such as [websockify](https://github.com/novnc/websockify) can be used.

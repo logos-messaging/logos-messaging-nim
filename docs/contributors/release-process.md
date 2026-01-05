@@ -69,7 +69,7 @@ For more context, see https://trunkbaseddevelopment.com/branch-for-release/
 6. **Validation of release candidate**
 
    6a. **Automated testing**
-     - Ensure all the unit tests (specifically js-waku tests) are green against the release candidate.
+     - Ensure all the unit tests (specifically logos-messaging-js tests) are green against the release candidate.
      - Ask Vac-QA and Vac-DST to run their available tests against the release candidate; share all release candidates with both teams.
 
      > We need an additional report like [this](https://www.notion.so/DST-Reports-1228f96fb65c80729cd1d98a7496fe6f) specifically from the DST team.

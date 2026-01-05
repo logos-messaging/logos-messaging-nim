@@ -143,8 +143,8 @@ Binary will be created as `<path to your test file.nim>.bin` under the `build` d
 make test/tests/common/test_enr_builder.nim
 ```
 
-### Testing against `js-waku`
-Refer to [js-waku repo](https://github.com/waku-org/js-waku/tree/master/packages/tests) for instructions.
+### Testing against `logos-messaging-js`
+Refer to [logos-messaging-js repo](https://github.com/logos-messaging/logos-messaging-js/tree/master/packages/tests) for instructions.
 
 ## Formatting
 

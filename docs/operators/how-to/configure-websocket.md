@@ -1,6 +1,6 @@
 # Configure websocket transport
 
-Websocket is currently the only Waku transport supported by browser nodes using [js-waku](https://github.com/status-im/js-waku).
+Websocket is currently the only Waku transport supported by browser nodes using [logos-messaging-js](https://github.com/logos-messaging/logos-messaging-js).
 Setting up websocket enables your node to directly serve browser peers.
 
 A valid certificate is necessary to serve browser nodes,

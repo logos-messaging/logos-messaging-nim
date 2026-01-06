@@ -42,8 +42,8 @@ suite "Waku v2 Rest API - Relay":
   var manager {.threadVar.}: OnchainGroupManager
 
   setup:
-    anvilProc = runAnvil()
-    manager = waitFor setupOnchainGroupManager()
+    anvilProc = runAnvil(stateFile = some(DEFAULT_ANVIL_STATE_PATH))
+    manager = waitFor setupOnchainGroupManager(deployContracts = false)
 
   teardown:
     stopAnvil(anvilProc)
@@ -268,11 +268,8 @@ suite "Waku v2 Rest API - Relay":
     let manager = cast[OnchainGroupManager](node.wakuRlnRelay.groupManager)
     let idCredentials = generateCredentials()
 
-    try:
-      waitFor manager.register(idCredentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false,
-        "exception raised when calling register: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
+      assert false, "Failed to register identity credentials" & getCurrentExceptionMsg()
 
     let rootUpdated = waitFor manager.updateRoots()
     info "Updated root for node", rootUpdated
@@ -545,11 +542,8 @@ suite "Waku v2 Rest API - Relay":
     let manager = cast[OnchainGroupManager](node.wakuRlnRelay.groupManager)
     let idCredentials = generateCredentials()
 
-    try:
-      waitFor manager.register(idCredentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false,
-        "exception raised when calling register: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
+      assert false, "Failed to register identity credentials" & getCurrentExceptionMsg()
 
     let rootUpdated = waitFor manager.updateRoots()
     info "Updated root for node", rootUpdated
@@ -617,11 +611,8 @@ suite "Waku v2 Rest API - Relay":
     let manager = cast[OnchainGroupManager](node.wakuRlnRelay.groupManager)
     let idCredentials = generateCredentials()
 
-    try:
-      waitFor manager.register(idCredentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false,
-        "exception raised when calling register: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
+      assert false, "Failed to register identity credentials" & getCurrentExceptionMsg()
 
     let rootUpdated = waitFor manager.updateRoots()
     info "Updated root for node", rootUpdated
@@ -679,11 +670,8 @@ suite "Waku v2 Rest API - Relay":
     let manager = cast[OnchainGroupManager](node.wakuRlnRelay.groupManager)
     let idCredentials = generateCredentials()
 
-    try:
-      waitFor manager.register(idCredentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false,
-        "exception raised when calling register: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
+      assert false, "Failed to register identity credentials" & getCurrentExceptionMsg()
 
     let rootUpdated = waitFor manager.updateRoots()
     info "Updated root for node", rootUpdated
@@ -754,11 +742,8 @@ suite "Waku v2 Rest API - Relay":
     let manager = cast[OnchainGroupManager](node.wakuRlnRelay.groupManager)
     let idCredentials = generateCredentials()
 
-    try:
-      waitFor manager.register(idCredentials, UserMessageLimit(20))
-    except Exception, CatchableError:
-      assert false,
-        "exception raised when calling register: " & getCurrentExceptionMsg()
+    (waitFor manager.register(idCredentials, UserMessageLimit(20))).isOkOr:
+      assert false, "Failed to register identity credentials" & getCurrentExceptionMsg()
 
     let rootUpdated = waitFor manager.updateRoots()
     info "Updated root for node", rootUpdated

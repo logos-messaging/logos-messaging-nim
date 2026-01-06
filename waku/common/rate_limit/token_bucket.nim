@@ -109,6 +109,23 @@ proc update(bucket: TokenBucket, currentTime: Moment) =
   else:
     updateStrict(bucket, currentTime)
 
+proc getAvailableCapacity*(
+    bucket: TokenBucket, currentTime: Moment = Moment.now()
+): tuple[budget: int, budgetCap: int, lastTimeFull: Moment] =
+  ## Returns the available capacity of the bucket: (budget, budgetCap)
+
+  if periodElapsed(bucket, currentTime):
+    case bucket.replenishMode
+    of ReplenishMode.Strict:
+      return (bucket.budgetCap, bucket.budgetCap, bucket.lastTimeFull)
+    of ReplenishMode.Compensating:
+      let distance = bucket.periodDistance(currentTime)
+      let recentAvgUsage = bucket.getUsageAverageSince(distance)
+      let compensation = bucket.calcCompensation(recentAvgUsage)
+      let availableBudget = bucket.budgetCap + compensation
+      return (availableBudget, bucket.budgetCap, bucket.lastTimeFull)
+  return (bucket.budget, bucket.budgetCap, bucket.lastTimeFull)
+
 proc tryConsume*(bucket: TokenBucket, tokens: int, now = Moment.now()): bool =
   ## If `tokens` are available, consume them,
   ## Otherwhise, return false.
@@ -138,26 +155,31 @@ proc new*(
     budgetCap: int,
     fillDuration: Duration = 1.seconds,
     mode: ReplenishMode = ReplenishMode.Compensating,
+    budget: int = -1, # -1 means "use budgetCap"
+    lastTimeFull: Moment = Moment.now(),
 ): T =
   assert not isZero(fillDuration)
   assert budgetCap != 0
+  assert lastTimeFull <= Moment.now()
+  let actualBudget = if budget == -1: budgetCap else: budget
+  assert actualBudget >= 0 and actualBudget <= budgetCap
 
   ## Create different mode TokenBucket
   case mode
   of ReplenishMode.Strict:
     return T(
-      budget: budgetCap,
+      budget: actualBudget,
       budgetCap: budgetCap,
       fillDuration: fillDuration,
-      lastTimeFull: Moment.now(),
+      lastTimeFull: lastTimeFull,
       replenishMode: mode,
     )
   of ReplenishMode.Compensating:
     T(
-      budget: budgetCap,
+      budget: actualBudget,
       budgetCap: budgetCap,
       fillDuration: fillDuration,
-      lastTimeFull: Moment.now(),
+      lastTimeFull: lastTimeFull,
       replenishMode: mode,
       maxCompensation: budgetCap.float * BUDGET_COMPENSATION_LIMIT_PERCENT,
     )

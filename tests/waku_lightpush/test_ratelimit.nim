@@ -124,7 +124,7 @@ suite "Rate limited push service":
 
     for testCnt in 0 .. 2:
       await successProc()
-      await sleepAsync(20.millis)
+      await sleepAsync(5.millis)
 
     await rejectProc()
 

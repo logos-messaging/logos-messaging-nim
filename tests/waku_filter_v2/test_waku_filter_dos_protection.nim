@@ -122,15 +122,15 @@ suite "Waku Filter - DOS protection":
     check client2.subscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
       none(FilterSubscribeErrorKind)
 
-    await sleepAsync(20.milliseconds)
+    await sleepAsync(5.milliseconds)
     check client1.subscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
       none(FilterSubscribeErrorKind)
     check client2.subscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
       none(FilterSubscribeErrorKind)
-    await sleepAsync(20.milliseconds)
+    await sleepAsync(5.milliseconds)
     check client1.subscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
       none(FilterSubscribeErrorKind)
-    await sleepAsync(20.milliseconds)
+    await sleepAsync(5.milliseconds)
     check client1.subscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
       some(FilterSubscribeErrorKind.TOO_MANY_REQUESTS)
     check client2.subscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
@@ -170,14 +170,14 @@ suite "Waku Filter - DOS protection":
 
     # After another ~500ms, ~1 token refilled; PING consumes 1 => expected remaining: 2
 
-    await sleepAsync(50.milliseconds)
+    await sleepAsync(10.milliseconds)
     check client1.unsubscribe(serverRemotePeerInfo, pubsubTopic, contentTopicSeq) ==
       none(FilterSubscribeErrorKind)
     check wakuFilter.subscriptions.isSubscribed(client1.clientPeerId) == false
 
-    # ~50ms is not enough to refill a token at 3/sec; UNSUBSCRIBE consumes 1 => expected remaining: 1
+    # ~10ms is not enough to refill a token at 3/sec; UNSUBSCRIBE consumes 1 => expected remaining: 1
 
-    await sleepAsync(50.milliseconds)
+    await sleepAsync(10.milliseconds)
     check client1.ping(serverRemotePeerInfo) == some(FilterSubscribeErrorKind.NOT_FOUND)
     # PING consumes the last token => expected remaining: 0
 

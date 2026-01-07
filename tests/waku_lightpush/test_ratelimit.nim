@@ -83,11 +83,9 @@ suite "Rate limited push service":
     # Don't rely on per-request timing assumptions or a single shared Future.
     # CI can be slow enough that sequential requests accidentally refill tokens.
     # Instead we issue a small burst and assert we observe at least one rejection.
-    var handledCount = 0
     let handler = proc(
         peer: PeerId, pubsubTopic: PubsubTopic, message: WakuMessage
     ): Future[WakuLightPushResult] {.async.} =
-      inc handledCount
       return lightpushSuccessResult(1)
 
     let

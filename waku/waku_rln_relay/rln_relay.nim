@@ -467,7 +467,7 @@ proc mount(
 
   return ok(wakuRlnRelay)
 
-proc isReady*(rlnPeer: WakuRLNRelay): Future[bool] {.async: (raises: [Exception]).} =
+proc isReady*(rlnPeer: WakuRLNRelay): Future[bool] {.async.} =
   ## returns true if the rln-relay protocol is ready to relay messages
   ## returns false otherwise
 

@@ -398,18 +398,24 @@ suite "Onchain group manager":
 
     manager.ethRpc = none(Web3)
 
-    let isReadyResult = waitFor manager.isReady()
+    var isReady = true
+    try:
+      isReady = waitFor manager.isReady()
+    except Exception, CatchableError:
+      assert false, "exception raised: " & getCurrentExceptionMsg()
 
     check:
-      isReadyResult.isErr()
-      isReadyResult.error == "Ethereum RPC client is not configured"
+      isReady == false
 
   test "isReady should return true if ethRpc is ready":
     (waitFor manager.init()).isOkOr:
       raiseAssert $error
 
-    let isReadyResult = waitFor manager.isReady()
+    var isReady = false
+    try:
+      isReady = waitFor manager.isReady()
+    except Exception, CatchableError:
+      assert false, "exception raised: " & getCurrentExceptionMsg()
 
     check:
-      isReadyResult.isOk()
-      isReadyResult.value == true
+      isReady == true

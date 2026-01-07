@@ -508,6 +508,7 @@ proc establishConnection(
           except CatchableError:
             error "failed connect Eth client", error = getCurrentExceptionMsg()
 
+        ## this exception is handled by the retrywrapper
         if not connected:
           raise newException(CatchableError, "all failed")
 

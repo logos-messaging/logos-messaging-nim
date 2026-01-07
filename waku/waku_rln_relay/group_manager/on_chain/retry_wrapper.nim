@@ -13,9 +13,7 @@ proc new*(T: type RetryStrategy): RetryStrategy =
   return RetryStrategy(retryDelay: DefaultRetryDelay, retryCount: DefaultRetryCount)
 
 proc retryWrapper*[T](
-    retryStrategy: RetryStrategy,
-    errStr: string,
-    body: proc(): Future[T] {.async.},
+    retryStrategy: RetryStrategy, errStr: string, body: proc(): Future[T] {.async.}
 ): Future[Result[T, string]] {.async.} =
   var retryCount = retryStrategy.retryCount
   var lastError = ""

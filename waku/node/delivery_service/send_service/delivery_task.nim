@@ -1,5 +1,6 @@
 import std/[options, times], chronos
 import waku/waku_core, waku/api/types, waku/requests/node_requests
+import waku/common/broker/broker_context
 
 type DeliveryState* {.pure.} = enum
   Entry
@@ -20,12 +21,17 @@ type DeliveryTask* = ref object
   errorDesc*: string
 
 proc create*(
-    T: type DeliveryTask, requestId: RequestId, envelop: MessageEnvelope
+    T: type DeliveryTask,
+    requestId: RequestId,
+    envelop: MessageEnvelope,
+    brokerCtx: BrokerContext,
 ): Result[T, string] =
   let msg = envelop.toWakuMessage()
   # TODO: use sync request for such as soon as available
   let relayShardRes = (
-    waitFor RequestRelayShard.request(none[PubsubTopic](), envelop.contentTopic)
+    waitFor RequestRelayShard.request(
+      brokerCtx, none[PubsubTopic](), envelop.contentTopic
+    )
   ).valueOr:
     return err($error)
 

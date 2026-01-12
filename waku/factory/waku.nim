@@ -42,7 +42,8 @@ import
   ../factory/internal_config,
   ../factory/app_callbacks,
   ../waku_enr/multiaddr,
-  ./waku_conf
+  ./waku_conf,
+  ../common/broker/broker_context
 
 logScope:
   topics = "wakunode waku"
@@ -71,6 +72,8 @@ type Waku* = ref object
   restServer*: WakuRestServerRef
   metricsServer*: MetricsHttpServerRef
   appCallbacks*: AppCallbacks
+
+  brokerCtx*: BrokerContext
 
 func version*(waku: Waku): string =
   waku.version
@@ -160,6 +163,7 @@ proc new*(
     T: type Waku, wakuConf: WakuConf, appCallbacks: AppCallbacks = nil
 ): Future[Result[Waku, string]] {.async.} =
   let rng = crypto.newRng()
+  let brokerCtx = globalBrokerContext()
 
   logging.setupLog(wakuConf.logLevel, wakuConf.logFormat)
 
@@ -210,6 +214,7 @@ proc new*(
     deliveryService: deliveryService,
     appCallbacks: appCallbacks,
     restServer: restServer,
+    brokerCtx: brokerCtx,
   )
 
   waku.setupSwitchServices(wakuConf, relay, rng)

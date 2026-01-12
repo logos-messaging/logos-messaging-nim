@@ -13,6 +13,7 @@ import
     waku_core/topics,
     events/delivery_events,
     waku_node,
+    common/broker/broker_context,
   ]
 
 const StoreCheckPeriod = chronos.minutes(5) ## How often to perform store queries
@@ -32,6 +33,7 @@ type RecvMessage = object
     ## timestamp of the rx message. We will not keep the rx messages forever
 
 type RecvService* = ref object of RootObj
+  brokerCtx: BrokerContext
   topicsInterest: Table[PubsubTopic, seq[ContentTopic]]
     ## Tracks message verification requests and when was the last time a
     ## pubsub topic was verified for missing messages
@@ -76,7 +78,12 @@ proc performDeliveryFeedback(
     success, dir, comment, msg_hash = shortLog(msgHash)
 
   DeliveryFeedbackEvent.emit(
-    success = success, dir = dir, comment = comment, msgHash = msgHash, msg = msg
+    brokerCtx = self.brokerCtx,
+    success = success,
+    dir = dir,
+    comment = comment,
+    msgHash = msgHash,
+    msg = msg,
   )
 
 proc msgChecker(self: RecvService) {.async.} =
@@ -153,7 +160,8 @@ proc new*(T: type RecvService, node: WakuNode): T =
   ## The storeClient will help to acquire any possible missed messages
 
   let now = getNowInNanosecondTime()
-  var recvService = RecvService(node: node, startTimeToCheck: now)
+  var recvService =
+    RecvService(node: node, startTimeToCheck: now, brokerCtx: node.brokerCtx)
 
   if not node.wakuFilterClient.isNil():
     let filterPushHandler = proc(
@@ -180,22 +188,24 @@ proc startRecvService*(self: RecvService) =
   self.msgPrunerHandler = self.loopPruneOldMessages()
 
   self.onSubscribeListener = OnFilterSubscribeEvent.listen(
+    self.brokerCtx,
     proc(subsEv: OnFilterSubscribeEvent): Future[void] {.async: (raises: []).} =
-      self.onSubscribe(subsEv.pubsubTopic, subsEv.contentTopics)
+      self.onSubscribe(subsEv.pubsubTopic, subsEv.contentTopics),
   ).valueOr:
     error "Failed to set OnFilterSubscribeEvent listener", error = error
     quit(QuitFailure)
 
   self.onUnsubscribeListener = OnFilterUnsubscribeEvent.listen(
+    self.brokerCtx,
     proc(subsEv: OnFilterUnsubscribeEvent): Future[void] {.async: (raises: []).} =
-      self.onUnsubscribe(subsEv.pubsubTopic, subsEv.contentTopics)
+      self.onUnsubscribe(subsEv.pubsubTopic, subsEv.contentTopics),
   ).valueOr:
     error "Failed to set OnFilterUnsubscribeEvent listener", error = error
     quit(QuitFailure)
 
 proc stopRecvService*(self: RecvService) {.async.} =
-  OnFilterSubscribeEvent.dropListener(self.onSubscribeListener)
-  OnFilterUnSubscribeEvent.dropListener(self.onUnsubscribeListener)
+  OnFilterSubscribeEvent.dropListener(self.brokerCtx, self.onSubscribeListener)
+  OnFilterUnsubscribeEvent.dropListener(self.brokerCtx, self.onUnsubscribeListener)
   if not self.msgCheckerHandler.isNil():
     await self.msgCheckerHandler.cancelAndWait()
   if not self.msgPrunerHandler.isNil():

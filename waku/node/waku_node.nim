@@ -57,6 +57,7 @@ import
     common/rate_limit/setting,
     common/callbacks,
     common/nimchronos,
+    common/broker/broker_context,
     waku_mix,
     requests/node_requests,
   ],
@@ -126,6 +127,7 @@ type
     enr*: enr.Record
     libp2pPing*: Ping
     rng*: ref rand.HmacDrbgContext
+    brokerCtx*: BrokerContext
     wakuRendezvous*: WakuRendezVous
     wakuRendezvousClient*: rendezvous_client.WakuRendezVousClient
     announcedAddresses*: seq[MultiAddress]
@@ -192,11 +194,14 @@ proc new*(
 
   info "Initializing networking", addrs = $netConfig.announcedAddresses
 
+  let brokerCtx = globalBrokerContext()
+
   let queue = newAsyncEventQueue[SubscriptionEvent](0)
   let node = WakuNode(
     peerManager: peerManager,
     switch: switch,
     rng: rng,
+    brokerCtx: brokerCtx,
     enr: enr,
     announcedAddresses: netConfig.announcedAddresses,
     topicSubscriptionQueue: queue,

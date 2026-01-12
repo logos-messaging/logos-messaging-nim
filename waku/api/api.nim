@@ -26,7 +26,7 @@ proc checkApiAvailability(w: Waku): Result[void, string] =
 
   # check if health is satisfactory
   # If Node is not healthy, return err("Waku node is not healthy")
-  let healthStatus = RequestNodeHealth.request()
+  let healthStatus = RequestNodeHealth.request(w.brokerCtx)
 
   if healthStatus.isErr():
     warn "Failed to get Waku node health status: ", error = healthStatus.error
@@ -44,7 +44,7 @@ proc send*(
 
   let requestId = newRequestId(w.rng)
 
-  let deliveryTask = DeliveryTask.create(requestId, envelope).valueOr:
+  let deliveryTask = DeliveryTask.create(requestId, envelope, w.brokerCtx).valueOr:
     return err("Failed to create delivery task: " & error)
 
   asyncSpawn w.deliveryService.sendService.send(deliveryTask)

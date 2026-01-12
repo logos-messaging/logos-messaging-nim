@@ -10,7 +10,7 @@ import
   bearssl/rand,
   stew/byteutils
 import
-  waku/[node/peer_manager, waku_core, events/delivery_events],
+  waku/[node/peer_manager, waku_core, events/delivery_events, common/broker/broker_context],
   ./common,
   ./protocol_metrics,
   ./rpc_codec,
@@ -20,6 +20,7 @@ logScope:
   topics = "waku filter client"
 
 type WakuFilterClient* = ref object of LPProtocol
+  brokerCtx: BrokerContext
   rng: ref HmacDrbgContext
   peerManager: PeerManager
   pushHandlers: seq[FilterPushHandler]
@@ -126,7 +127,7 @@ proc subscribe*(
 
   ?await wfc.sendSubscribeRequest(servicePeer, filterSubscribeRequest)
 
-  OnFilterSubscribeEvent.emit(pubSubTopic, contentTopicSeq)
+  OnFilterSubscribeEvent.emit(wfc.brokerCtx, pubsubTopic, contentTopicSeq)
 
   return ok()
 
@@ -202,6 +203,9 @@ proc initProtocolHandler(wfc: WakuFilterClient) =
 proc new*(
     T: type WakuFilterClient, peerManager: PeerManager, rng: ref HmacDrbgContext
 ): T =
-  let wfc = WakuFilterClient(rng: rng, peerManager: peerManager, pushHandlers: @[])
+  let brokerCtx = globalBrokerContext()
+  let wfc = WakuFilterClient(
+    brokerCtx: brokerCtx, rng: rng, peerManager: peerManager, pushHandlers: @[]
+  )
   wfc.initProtocolHandler()
   wfc

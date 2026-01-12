@@ -1,10 +1,12 @@
 import chronos
 import ./delivery_task
+import waku/common/broker/broker_context
 
 {.push raises: [].}
 
 type BaseSendProcessor* = ref object of RootObj
   fallbackProcessor*: BaseSendProcessor
+  brokerCtx*: BrokerContext
 
 proc chain*(self: BaseSendProcessor, next: BaseSendProcessor) =
   self.fallbackProcessor = next

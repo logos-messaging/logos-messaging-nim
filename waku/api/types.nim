@@ -51,14 +51,15 @@ proc toWakuMessage*(envelope: MessageEnvelope): WakuMessage =
     timestamp: getNanosecondTime(getTime().toUnixFloat()),
   )
 
-  # TODO: First find out if proof is needed at all
-  let requestedProof = (
-    waitFor RequestGenerateRlnProof.request(wm, getTime().toUnixFloat())
-  ).valueOr:
-    warn "Failed to add RLN proof to WakuMessage: ", error = error
-    return wm
+  ## TODO: First find out if proof is needed at all
+  ## Follow up: left it to the send logic to add RLN proof if needed and possible
+  # let requestedProof = (
+  #   waitFor RequestGenerateRlnProof.request(wm, getTime().toUnixFloat())
+  # ).valueOr:
+  #   warn "Failed to add RLN proof to WakuMessage: ", error = error
+  #   return wm
 
-  wm.proof = requestedProof.proof
+  # wm.proof = requestedProof.proof
   return wm
 
 {.pop.}

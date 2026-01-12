@@ -5,7 +5,8 @@ import
   waku/waku_node,
   waku/waku_core,
   waku/node/peer_manager,
-  waku/waku_lightpush/[callbacks, common, client, rpc]
+  waku/waku_lightpush/[callbacks, common, client, rpc],
+  waku/common/broker/broker_context
 
 import ./[delivery_task, send_processor]
 
@@ -20,8 +21,10 @@ proc new*(
     T: type LightpushSendProcessor,
     peerManager: PeerManager,
     lightpushClient: WakuLightPushClient,
+    brokerCtx: BrokerContext,
 ): T =
-  return T(peerManager: peerManager, lightpushClient: lightpushClient)
+  return
+    T(peerManager: peerManager, lightpushClient: lightpushClient, brokerCtx: brokerCtx)
 
 proc isLightpushPeerAvailable(
     self: LightpushSendProcessor, pubsubTopic: PubsubTopic

@@ -18,6 +18,7 @@ import
     waku_lightpush/callbacks,
     events/delivery_events,
     events/message_events,
+    common/broker/broker_context,
   ]
 
 logScope:
@@ -48,6 +49,7 @@ const ArchiveTime = chronos.seconds(3)
   ## received and archived by a store node
 
 type SendService* = ref object of RootObj
+  brokerCtx: BrokerContext
   taskCache: seq[DeliveryTask]
     ## Cache that contains the delivery task per message hash.
     ## This is needed to make sure the published messages are properly published
@@ -63,6 +65,7 @@ proc setupSendProcessorChain(
     lightpushClient: WakuLightPushClient,
     relay: WakuRelay,
     rlnRelay: WakuRLNRelay,
+    brokerCtx: BrokerContext,
 ): Result[BaseSendProcessor, string] =
   let isRelayAvail = not relay.isNil()
   let isLightPushAvail = not lightpushClient.isNil()
@@ -80,9 +83,9 @@ proc setupSendProcessorChain(
         some(rlnRelay)
     let publishProc = getRelayPushHandler(relay, rln)
 
-    processors.add(RelaySendProcessor.new(isLightPushAvail, publishProc))
+    processors.add(RelaySendProcessor.new(isLightPushAvail, publishProc, brokerCtx))
   if isLightPushAvail:
-    processors.add(LightpushSendProcessor.new(peerManager, lightpushClient))
+    processors.add(LightpushSendProcessor.new(peerManager, lightpushClient, brokerCtx))
 
   var currentProcessor: BaseSendProcessor = processors[0]
   for i in 1 ..< processors.len():
@@ -102,11 +105,12 @@ proc new*(
   let checkStoreForMessages = preferP2PReliability and not w.wakuStoreClient.isNil()
 
   let sendProcessorChain = setupSendProcessorChain(
-    w.peerManager, w.wakuLightPushClient, w.wakuRelay, w.wakuRlnRelay
+    w.peerManager, w.wakuLightPushClient, w.wakuRelay, w.wakuRlnRelay, w.brokerCtx
   ).valueOr:
     return err(error)
 
   let sendService = SendService(
+    brokerCtx: w.brokerCtx,
     taskCache: newSeq[DeliveryTask](),
     serviceLoopHandle: nil,
     sendProcessor: sendProcessorChain,
@@ -170,16 +174,18 @@ proc reportTaskResult(self: SendService, task: DeliveryTask) =
     # TODO: in case of of unable to strore check messages shall we report success instead?
     info "Message successfully propagated",
       requestId = task.requestId, msgHash = task.msgHash
-    MessagePropagatedEvent.emit(task.requestId, task.msgHash.toString())
+    MessagePropagatedEvent.emit(self.brokerCtx, task.requestId, task.msgHash.toString())
     return
   of DeliveryState.SuccessfullyValidated:
     info "Message successfully sent", requestId = task.requestId, msgHash = task.msgHash
-    MessageSentEvent.emit(task.requestId, task.msgHash.toString())
+    MessageSentEvent.emit(self.brokerCtx, task.requestId, task.msgHash.toString())
     return
   of DeliveryState.FailedToDeliver:
     error "Failed to send message",
       requestId = task.requestId, msgHash = task.msgHash, error = task.errorDesc
-    MessageErrorEvent.emit(task.requestId, task.msgHash.toString(), task.errorDesc)
+    MessageErrorEvent.emit(
+      self.brokerCtx, task.requestId, task.msgHash.toString(), task.errorDesc
+    )
     return
   else:
     # rest of the states are intermediate and does not translate to event
@@ -190,7 +196,10 @@ proc reportTaskResult(self: SendService, task: DeliveryTask) =
       requestId = task.requestId, msgHash = task.msgHash, error = "Message too old"
     task.state = DeliveryState.FailedToDeliver
     MessageErrorEvent.emit(
-      task.requestId, task.msgHash.toString(), "Unable to send within retry time window"
+      self.brokerCtx,
+      task.requestId,
+      task.msgHash.toString(),
+      "Unable to send within retry time window",
     )
 
 proc evaluateAndCleanUp(self: SendService) =

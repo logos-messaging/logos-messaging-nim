@@ -2,6 +2,7 @@ import chronos, chronicles
 import std/options
 import waku/[waku_node, waku_core], waku/waku_lightpush/[common, callbacks, rpc]
 import waku/requests/health_request
+import waku/common/broker/broker_context
 import waku/api/types
 import ./[delivery_task, send_processor]
 
@@ -16,6 +17,7 @@ proc new*(
     T: type RelaySendProcessor,
     lightpushAvailable: bool,
     publishProc: PushMessageHandler,
+    brokerCtx: BrokerContext,
 ): RelaySendProcessor =
   let fallbackStateToSet =
     if lightpushAvailable:
@@ -23,11 +25,14 @@ proc new*(
     else:
       DeliveryState.FailedToDeliver
 
-  return
-    RelaySendProcessor(publishProc: publishProc, fallbackStateToSet: fallbackStateToSet)
+  return RelaySendProcessor(
+    publishProc: publishProc,
+    fallbackStateToSet: fallbackStateToSet,
+    brokerCtx: brokerCtx,
+  )
 
-proc isTopicHealthy(topic: PubsubTopic): bool {.gcsafe.} =
-  let healthReport = RequestRelayTopicsHealth.request(@[topic]).valueOr:
+proc isTopicHealthy(self: RelaySendProcessor, topic: PubsubTopic): bool {.gcsafe.} =
+  let healthReport = RequestRelayTopicsHealth.request(self.brokerCtx, @[topic]).valueOr:
     return false
 
   if healthReport.topicHealth.len() < 1:
@@ -38,7 +43,7 @@ proc isTopicHealthy(topic: PubsubTopic): bool {.gcsafe.} =
 method isValidProcessor*(
     self: RelaySendProcessor, task: DeliveryTask
 ): bool {.gcsafe.} =
-  return isTopicHealthy(task.pubsubTopic)
+  return self.isTopicHealthy(task.pubsubTopic)
 
 method sendImpl*(self: RelaySendProcessor, task: DeliveryTask): Future[void] {.async.} =
   task.tryCount.inc()

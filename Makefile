@@ -60,6 +60,7 @@ waku.nims:
 	ln -s waku.nimble $@
 
 update: | waku.nims
+	git submodule update --init --recursive
 	nimble refresh
 	$(MAKE) build-nph
 

@@ -83,20 +83,22 @@ proc buildModule(filePath, params = "", lang = "c"): bool =
 proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
+  # Get extra params from NIM_PARAMS environment variable
   var extra_params = params
-  for i in 2 ..< paramCount():
-    extra_params &= " " & paramStr(i)
+  let nimParams = getEnv("NIM_PARAMS")
+  if nimParams.len > 0:
+    extra_params &= " " & nimParams
   exec "nim " & lang & " --out:build/" & name & " --mm:refc " & extra_params & " " &
     srcDir & name & ".nim"
 
 proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static") =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
+  # Get extra params from NIM_PARAMS environment variable
   var extra_params = params
-  for i in 2 ..< (paramCount() - 1):
-    extra_params &= " " & paramStr(i)
+  let nimParams = getEnv("NIM_PARAMS")
+  if nimParams.len > 0:
+    extra_params &= " " & nimParams
   if `type` == "static":
     exec "nim c" & " --out:build/" & lib_name &
       " --threads:on --app:staticlib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:libwaku --skipParentCfg:on -d:discv5_protocol_id=d5waku " &

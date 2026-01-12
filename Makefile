@@ -66,7 +66,7 @@ update: | waku.nims
 
 clean:
 	rm -rf build
-	rm -rf ~/.nimble/pkgs
+	rm -rf ~/.nimble/pkgs2
 	rm -rf ~/.nimble/pkgcache
 
 build:

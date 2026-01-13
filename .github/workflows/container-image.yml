@@ -58,7 +58,7 @@ jobs:
         run: |
           make update
 
-          make -j${NPROC} V=1 QUICK_AND_DIRTY_COMPILER=1 NIMFLAGS="-d:disableMarchNative -d:postgres -d:chronicles_colors:none" wakunode2
+          make -j${NPROC} V=1 QUICK_AND_DIRTY_COMPILER=1 USE_LIBBACKTRACE=0 NIMFLAGS="-d:disableMarchNative -d:postgres -d:chronicles_colors:none" wakunode2
 
           SHORT_REF=$(git rev-parse --short HEAD)
 

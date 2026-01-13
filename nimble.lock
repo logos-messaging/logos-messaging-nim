@@ -143,7 +143,7 @@
     },
     "chronos": {
       "version": "4.0.4",
-      "vcsRevision": "0646c444fce7c7ed08ef6f2c9a7abfd172ffe655",
+      "vcsRevision": "712f9937e46a9ba1949230e8e119d776aea1c6bb",
       "url": "https://github.com/status-im/nim-chronos",
       "downloadMethod": "git",
       "dependencies": [
@@ -154,7 +154,7 @@
         "unittest2"
       ],
       "checksums": {
-        "sha1": "455802a90204d8ad6b31d53f2efff8ebfe4c834a"
+        "sha1": "03e96742e7148c38767c028c23a99cf316672f1c"
       }
     },
     "confutils": {
@@ -457,7 +457,7 @@
     },
     "libp2p": {
       "version": "1.14.3",
-      "vcsRevision": "e82080f7b1aa61c6d35fa5311b873f41eff4bb52",
+      "vcsRevision": "eb7e6ff89889e41b57515f891ba82986c54809fb",
       "url": "https://github.com/vacp2p/nim-libp2p",
       "downloadMethod": "git",
       "dependencies": [
@@ -476,12 +476,12 @@
         "jwt"
       ],
       "checksums": {
-        "sha1": "3c089f3ccd23aa5a04e5db288cb8eef524938487"
+        "sha1": "04eed030305ed9ec128b6699066f0988eb75ec89"
       }
     },
     "lsquic": {
       "version": "0.0.1",
-      "vcsRevision": "de410c4f0a29659f677f2ca5d7f4a8e812850082",
+      "vcsRevision": "f3fe33462601ea34eb2e8e9c357c92e61f8d121b",
       "url": "https://github.com/vacp2p/nim-lsquic",
       "downloadMethod": "git",
       "dependencies": [
@@ -493,7 +493,7 @@
         "chronicles"
       ],
       "checksums": {
-        "sha1": "d5b8f3eec178a2a93a862ff67f23bf3a99de3426"
+        "sha1": "407b39ad3e84ad794b76df8d63ecafb749af6f4f"
       }
     },
     "presto": {

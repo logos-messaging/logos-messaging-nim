@@ -33,6 +33,7 @@ jobs:
           make
           cmake
           upx
+          mingw-w64-x86_64-nim
           mingw-w64-x86_64-rust
           mingw-w64-x86_64-postgresql
           mingw-w64-x86_64-gcc
@@ -54,31 +55,10 @@ jobs:
 
     - name: Verify dependencies
       run: |
-        which upx gcc g++ make cmake cargo rustc python
+        which upx gcc g++ make cmake cargo rustc python nim nimble
 
-    - name: Updating submodules
-      run: git submodule update --init --recursive
-
-    - name: Creating tmp directory
-      run: mkdir -p tmp
-
-    - name: Building Nim
-      run: |
-        cd vendor/nimbus-build-system/vendor/Nim
-        ./build_all.bat
-        cd ../../../..
-
-    - name: Building miniupnpc
-      run: |
-        cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
-        make -f Makefile.mingw CC=gcc CXX=g++ libminiupnpc.a V=1
-        cd ../../../../..
-
-    - name: Building libnatpmp
-      run: |
-        cd ./vendor/nim-nat-traversal/vendor/libnatpmp-upstream
-        make CC="gcc -fPIC -D_WIN32_WINNT=0x0600 -DNATPMP_STATICLIB" libnatpmp.a V=1
-        cd ../../../../
+    - name: Make update
+      run: make update
 
     - name: Building wakunode2.exe
       run: |

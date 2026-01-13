@@ -28,6 +28,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Install Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:2.2.4
+
       - name: Get submodules hash
         id: submodules
         run: |

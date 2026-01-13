@@ -63,6 +63,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:2.2.4
+
       - name: Get submodules hash
         id: submodules
         run: |
@@ -103,6 +108,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:2.2.4
 
       - name: Get submodules hash
         id: submodules
@@ -170,6 +180,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:2.2.4
 
       - name: Get submodules hash
         id: submodules

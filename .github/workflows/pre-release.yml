@@ -44,6 +44,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:2.2.4
+
       - name: prep variables
         id: vars
         run: |

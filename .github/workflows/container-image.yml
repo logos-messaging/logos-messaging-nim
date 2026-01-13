@@ -46,6 +46,12 @@ jobs:
         if: ${{ steps.secrets.outcome == 'success' }}
         uses: actions/checkout@v4
 
+      - name: Install Nim
+        if: ${{ steps.secrets.outcome == 'success' }}
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:2.2.4
+
       - name: Get submodules hash
         id: submodules
         if: ${{ steps.secrets.outcome == 'success' }}

@@ -1,4 +1,4 @@
-log-level = "INFO"
+log-level = "TRACE"
 relay = true
 mix = true
 filter = true
@@ -22,4 +22,6 @@ mixkey = "a87db88246ec0eedda347b9b643864bee3d6933eb15ba41e6d58cb678d813258"
 rendezvous = true
 listen-address = "127.0.0.1"
 nat = "extip:127.0.0.1"
+ext-multiaddr = ["/ip4/127.0.0.1/tcp/60001"]
+ext-multiaddr-only = true
 ip-colocation-limit=0

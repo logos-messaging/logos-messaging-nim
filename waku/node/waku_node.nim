@@ -126,6 +126,7 @@ type
     wakuRendezvous*: WakuRendezVous
     wakuRendezvousClient*: rendezvous_client.WakuRendezVousClient
     announcedAddresses*: seq[MultiAddress]
+    extMultiAddrsOnly*: bool # When true, skip automatic IP address replacement
     started*: bool # Indicates that node has started listening
     topicSubscriptionQueue*: AsyncEventQueue[SubscriptionEvent]
     rateLimitSettings*: ProtocolRateLimitSettings
@@ -403,6 +404,11 @@ proc isBindIpWithZeroPort(inputMultiAdd: MultiAddress): bool =
   return false
 
 proc updateAnnouncedAddrWithPrimaryIpAddr*(node: WakuNode): Result[void, string] =
+  # Skip automatic IP replacement if extMultiAddrsOnly is set
+  # This respects the user's explicitly configured announced addresses
+  if node.extMultiAddrsOnly:
+    return ok()
+
   let peerInfo = node.switch.peerInfo
   var announcedStr = ""
   var listenStr = ""

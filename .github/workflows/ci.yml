@@ -66,20 +66,7 @@ jobs:
       - name: Install Nim
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.4
-
-      - name: Get submodules hash
-        id: submodules
-        run: |
-          echo "hash=$(git submodule status | awk '{print $1}' | sort | shasum -a 256 | sed 's/[ -]*//g')" >> $GITHUB_OUTPUT
-
-      - name: Cache submodules
-        uses: actions/cache@v3
-        with:
-          path: |
-            vendor/
-            .git/modules
-          key: ${{ runner.os }}-vendor-modules-${{ steps.submodules.outputs.hash }}
+          version: binary:2.2.6
 
       - name: Make update
         run: make update
@@ -112,20 +99,7 @@ jobs:
       - name: Install Nim
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.4
-
-      - name: Get submodules hash
-        id: submodules
-        run: |
-          echo "hash=$(git submodule status | awk '{print $1}' | sort | shasum -a 256 | sed 's/[ -]*//g')" >> $GITHUB_OUTPUT
-
-      - name: Cache submodules
-        uses: actions/cache@v3
-        with:
-          path: |
-            vendor/
-            .git/modules
-          key: ${{ runner.os }}-vendor-modules-${{ steps.submodules.outputs.hash }}
+          version: binary:2.2.6
 
       - name: Make update
         run: make update
@@ -184,20 +158,7 @@ jobs:
       - name: Install Nim
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.4
-
-      - name: Get submodules hash
-        id: submodules
-        run: |
-          echo "hash=$(git submodule status | awk '{print $1}' | sort | shasum -a 256 | sed 's/[ -]*//g')" >> $GITHUB_OUTPUT
-
-      - name: Cache submodules
-        uses: actions/cache@v3
-        with:
-          path: |
-            vendor/
-            .git/modules
-          key: ${{ runner.os }}-vendor-modules-${{ steps.submodules.outputs.hash }}
+          version: binary:2.2.6
 
       - name: Build nph
         run: |

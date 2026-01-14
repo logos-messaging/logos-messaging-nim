@@ -56,7 +56,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     name: build-${{ matrix.os }}
     steps:
@@ -67,6 +67,14 @@ jobs:
         uses: iffy/install-nim@v5
         with:
           version: binary:2.2.6
+
+      - name: Cache nimble packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nimble/pkgs2
+          key: ${{ runner.os }}-nimble-${{ hashFiles('nimble.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nimble-
 
       - name: Make update
         run: make update
@@ -82,6 +90,8 @@ jobs:
           echo "=== Check for empty paths ==="
           grep -n '""' nimble.paths || echo "No empty paths found"
           grep -n '^--path:$' nimble.paths || echo "No empty --path: entries"
+          echo "=== Verify nimcrypto is in paths ==="
+          grep -c nimcrypto nimble.paths || echo "WARNING: nimcrypto not found in nimble.paths!"
 
       - name: Build binaries
         run: make V=1 QUICK_AND_DIRTY_COMPILER=1 USE_LIBBACKTRACE=0 all tools
@@ -101,7 +111,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     name: test-${{ matrix.os }}
     steps:
@@ -113,8 +123,24 @@ jobs:
         with:
           version: binary:2.2.6
 
+      - name: Cache nimble packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nimble/pkgs2
+          key: ${{ runner.os }}-nimble-${{ hashFiles('nimble.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nimble-
+
       - name: Make update
         run: make update
+
+      - name: Verify nimble.paths
+        run: |
+          echo "=== nimble.paths content ==="
+          cat nimble.paths || { echo "ERROR: nimble.paths not found!"; exit 1; }
+          echo "=== Verify critical dependencies ==="
+          grep -q nimcrypto nimble.paths || { echo "ERROR: nimcrypto not in paths!"; exit 1; }
+          grep -q libp2p nimble.paths || { echo "ERROR: libp2p not in paths!"; exit 1; }
 
       - name: Run tests
         run: |

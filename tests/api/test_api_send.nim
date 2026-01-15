@@ -9,14 +9,14 @@ import
 import ../testlib/[common, wakucore, wakunode, testasync, futures, testutils]
 import
   waku,
-  waku/
-    [
-      waku_node,
-      waku_core,
-      waku_relay/protocol,
-      waku_filter_v2/common,
-      waku_store/common,
-    ]
+  waku/[
+    waku_node,
+    waku_core,
+    waku_relay/protocol,
+    waku_filter_v2/common,
+    waku_store/common,
+    common/broker/broker_context,
+  ]
 import waku/api/api_conf, waku/factory/waku_conf, waku/factory/networks_config
 
 suite "Waku API - Send":
@@ -45,34 +45,36 @@ suite "Waku API - Send":
     #   handlerFuture.complete((pubsubTopic, message))
     #   return ok()
 
-    relayNode1 =
-      newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
-    relayNode2 =
-      newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
+    lockNewGlobalBrokerContext:
+      relayNode1 =
+        newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
+      await relayNode1.start()
+      (await relayNode1.mountRelay()).isOkOr:
+        raiseAssert "Failed to mount relay"
 
-    lightpushNode =
-      newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
-    storeNode =
-      newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
+    lockNewGlobalBrokerContext:
+      relayNode2 =
+        newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
+      await relayNode2.start()
+      (await relayNode2.mountRelay()).isOkOr:
+        raiseAssert "Failed to mount relay"
 
-    await allFutures(
-      relayNode1.start(), relayNode2.start(), lightpushNode.start(), storeNode.start()
-    )
+    lockNewGlobalBrokerContext:
+      lightpushNode =
+        newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
+      await lightpushNode.start()
+      (await lightpushNode.mountRelay()).isOkOr:
+        raiseAssert "Failed to mount relay"
+      (await lightpushNode.mountLightPush()).isOkOr:
+        raiseAssert "Failed to mount lightpush"
 
-    (await relayNode1.mountRelay()).isOkOr:
-      raiseAssert "Failed to mount relay"
-
-    (await relayNode2.mountRelay()).isOkOr:
-      raiseAssert "Failed to mount relay"
-
-    (await lightpushNode.mountRelay()).isOkOr:
-      raiseAssert "Failed to mount relay"
-    (await lightpushNode.mountLightPush()).isOkOr:
-      raiseAssert "Failed to mount lightpush"
-
-    (await storeNode.mountRelay()).isOkOr:
-      raiseAssert "Failed to mount relay"
-    await storeNode.mountStore()
+    lockNewGlobalBrokerContext:
+      storeNode =
+        newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
+      await storeNode.start()
+      (await storeNode.mountRelay()).isOkOr:
+        raiseAssert "Failed to mount relay"
+      await storeNode.mountStore()
 
     relayNode1PeerInfo = relayNode1.peerInfo.toRemotePeerInfo()
     relayNode1PeerId = relayNode1.peerInfo.peerId
@@ -85,6 +87,7 @@ suite "Waku API - Send":
 
     storeNodePeerInfo = storeNode.peerInfo.toRemotePeerInfo()
     storeNodePeerId = storeNode.peerInfo.peerId
+
   asyncTeardown:
     await allFutures(
       relayNode1.stop(), relayNode2.stop(), lightpushNode.stop(), storeNode.stop()
@@ -111,30 +114,40 @@ suite "Waku API - Send":
       wakuConf.clusterId == 1
       wakuConf.shardingConf.numShardsInCluster == 1
 
-    var node = (await createNode(nodeConfig)).valueOr:
-      raiseAssert error
+    var node: Waku
+    lockNewGlobalBrokerContext:
+      node = (await createNode(nodeConfig)).valueOr:
+        raiseAssert error
+      (await startWaku(addr node)).isOkOr:
+        raiseAssert "Failed to start Waku node: " & error
 
     let sentListener = MessageSentEvent.listen(
+      node.brokerCtx,
       proc(event: MessageSentEvent) {.async: (raises: []).} =
         raiseAssert "Should not be called"
+      ,
     ).valueOr:
       raiseAssert error
 
     let errorListener = MessageErrorEvent.listen(
+      node.brokerCtx,
       proc(event: MessageErrorEvent) {.async: (raises: []).} =
         check true
+      ,
     ).valueOr:
       raiseAssert error
 
     let propagatedListener = MessagePropagatedEvent.listen(
+      node.brokerCtx,
       proc(event: MessagePropagatedEvent) {.async: (raises: []).} =
         raiseAssert "Should not be called"
+      ,
     ).valueOr:
       raiseAssert error
     defer:
-      MessageSentEvent.dropListener(sentListener)
-      MessageErrorEvent.dropListener(errorListener)
-      MessagePropagatedEvent.dropListener(propagatedListener)
+      MessageSentEvent.dropListener(node.brokerCtx, sentListener)
+      MessageErrorEvent.dropListener(node.brokerCtx, errorListener)
+      MessagePropagatedEvent.dropListener(node.brokerCtx, propagatedListener)
 
     let envelope = MessageEnvelope.init(
       ContentTopic("/waku/2/default-content/proto"), "test payload"

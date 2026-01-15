@@ -29,9 +29,7 @@ proc create*(
   let msg = envelop.toWakuMessage()
   # TODO: use sync request for such as soon as available
   let relayShardRes = (
-    waitFor RequestRelayShard.request(
-      brokerCtx, none[PubsubTopic](), envelop.contentTopic
-    )
+    RequestRelayShard.request(brokerCtx, none[PubsubTopic](), envelop.contentTopic)
   ).valueOr:
     return err($error)
 

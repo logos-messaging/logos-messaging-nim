@@ -60,6 +60,7 @@ import
     common/broker/broker_context,
     waku_mix,
     requests/node_requests,
+    common/broker/broker_context,
   ],
   ./net_config,
   ./peer_manager
@@ -466,17 +467,18 @@ proc updateAnnouncedAddrWithPrimaryIpAddr*(node: WakuNode): Result[void, string]
 
 proc startProvidersAndListeners*(node: WakuNode) =
   RequestRelayShard.setProvider(
+    node.brokerCtx,
     proc(
         pubsubTopic: Option[PubsubTopic], contentTopic: ContentTopic
-    ): Future[Result[RequestRelayShard, string]] {.async.} =
+    ): Result[RequestRelayShard, string] =
       let shard = node.deduceRelayShard(contentTopic, pubsubTopic).valueOr:
         return err($error)
-      return ok(RequestRelayShard(relayShard: shard))
+      return ok(RequestRelayShard(relayShard: shard)),
   ).isOkOr:
     error "Can't set proveder for RequestRelayShard", error = error
 
 proc stopProvidersAndListeners*(node: WakuNode) =
-  RequestRelayShard.clearProvider()
+  RequestRelayShard.clearProvider(node.brokerCtx)
 
 proc start*(node: WakuNode) {.async.} =
   ## Starts a created Waku Node and

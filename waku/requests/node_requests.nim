@@ -2,10 +2,10 @@ import std/options
 import waku/common/broker/[request_broker, multi_request_broker]
 import waku/waku_core/[topics]
 
-RequestBroker:
+RequestBroker(sync):
   type RequestRelayShard* = object
     relayShard*: RelayShard
 
   proc signature(
     pubsubTopic: Option[PubsubTopic], contentTopic: ContentTopic
-  ): Future[Result[RequestRelayShard, string]] {.async.}
+  ): Result[RequestRelayShard, string]

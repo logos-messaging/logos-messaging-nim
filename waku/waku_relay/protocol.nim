@@ -22,7 +22,8 @@ import
   waku/waku_core,
   waku/node/health_monitor/topic_health,
   waku/requests/health_request,
-  ./message_id
+  ./message_id,
+  waku/common/broker/broker_context
 
 from ../waku_core/codecs import WakuRelayCodec
 export WakuRelayCodec
@@ -326,12 +327,13 @@ proc initRelayObservers(w: WakuRelay) =
 
 proc initRequestProviders(w: WakuRelay) =
   RequestRelayTopicsHealth.setProvider(
+    globalBrokerContext(),
     proc(topics: seq[PubsubTopic]): Result[RequestRelayTopicsHealth, string] =
       var collectedRes: RequestRelayTopicsHealth
       for topic in topics:
         let health = w.topicsHealth.getOrDefault(topic, TopicHealth.NOT_SUBSCRIBED)
         collectedRes.topicHealth.add((topic, health))
-      return ok(collectedRes)
+      return ok(collectedRes),
   ).isOkOr:
     error "Cannot set Relay Topics Health request provider", error = error
 

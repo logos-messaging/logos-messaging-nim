@@ -43,7 +43,9 @@ import
   ../factory/app_callbacks,
   ../waku_enr/multiaddr,
   ./waku_conf,
-  ../common/broker/broker_context
+  ../common/broker/broker_context,
+  ../requests/health_request,
+  ../api/types
 
 logScope:
   topics = "wakunode waku"
@@ -413,6 +415,31 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
   waku[].healthMonitor.startHealthMonitor().isOkOr:
     return err("failed to start health monitor: " & $error)
 
+  ## Setup RequestNodeHealth provider
+
+  RequestNodeHealth.setProvider(
+    globalBrokerContext(),
+    proc(): Result[RequestNodeHealth, string] =
+      let healthReportFut = waku[].healthMonitor.getNodeHealthReport()
+      if not healthReportFut.completed():
+        return err("Health report not available")
+      try:
+        let healthReport = healthReportFut.read()
+        # Convert HealthStatus to NodeHealth
+        let nodeHealth =
+          case healthReport.nodeHealth
+          of HealthStatus.READY:
+            NodeHealth.Healthy
+          of HealthStatus.SYNCHRONIZING, HealthStatus.INITIALIZING:
+            NodeHealth.MinimallyHealthy
+          else:
+            NodeHealth.Unhealthy
+        ok(RequestNodeHealth(healthStatus: nodeHealth))
+      except CatchableError:
+        err("Failed to read health report: " & getCurrentExceptionMsg()),
+  ).isOkOr:
+    error "Failed to set RequestNodeHealth provider", error = error
+
   if conf.restServerConf.isSome():
     rest_server_builder.startRestServerProtocolSupport(
       waku[].restServer,
@@ -468,6 +495,9 @@ proc stop*(waku: Waku): Future[Result[void, string]] {.async: (raises: []).} =
 
     if not waku.healthMonitor.isNil():
       await waku.healthMonitor.stopHealthMonitor()
+
+    ## Clear RequestNodeHealth provider
+    RequestNodeHealth.clearProvider(waku.brokerCtx)
 
     if not waku.restServer.isNil():
       await waku.restServer.stop()

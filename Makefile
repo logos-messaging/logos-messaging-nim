@@ -278,7 +278,7 @@ clean-nph:
 	rm -f $(NPH)
 
 print-nph-path:
-	echo "$(NPH)"
+	@echo "$(NPH)"
 
 clean: | clean-nph
 

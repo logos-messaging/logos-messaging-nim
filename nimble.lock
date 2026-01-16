@@ -193,12 +193,12 @@
     },
     "nimcrypto": {
       "version": "0.7.3",
-      "vcsRevision": "b3dbc9c4d08e58c5b7bfad6dc7ef2ee52f2f4c08",
+      "vcsRevision": "423ea4fed8de6f4544b7e3b30d868f527ed3b947",
       "url": "https://github.com/cheatfate/nimcrypto",
       "downloadMethod": "git",
       "dependencies": [],
       "checksums": {
-        "sha1": "f72b90fe3f4da09efa482de4f8729e7ee4abea2f"
+        "sha1": "580910605aca0ea60b40bfaa116d0b8af1091314"
       }
     },
     "stint": {

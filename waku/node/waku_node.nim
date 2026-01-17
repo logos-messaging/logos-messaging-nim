@@ -55,6 +55,7 @@ import
   ../waku_rln_relay,
   ./net_config,
   ./peer_manager,
+  ./health_monitor/health_status,
   ../common/rate_limit/setting,
   ../common/callbacks,
   ../common/nimchronos,

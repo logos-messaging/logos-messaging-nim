@@ -44,6 +44,7 @@ proc writeValue*(
 ) {.raises: [IOError].} =
   writer.beginRecord()
   writer.writeField("nodeHealth", $value.nodeHealth)
+  writer.writeField("nodeState", $value.nodeState)
   writer.writeField("protocolsHealth", value.protocolsHealth)
   writer.endRecord()
 
@@ -52,6 +53,7 @@ proc readValue*(
 ) {.raises: [SerializationError, IOError].} =
   var
     nodeHealth: Option[HealthStatus]
+    nodeState: Option[NodeHealthStatus]
     protocolsHealth: Option[seq[ProtocolHealth]]
 
   for fieldName in readObjectFields(reader):
@@ -66,6 +68,14 @@ proc readValue*(
         reader.raiseUnexpectedValue("Invalid `health` value: " & $error)
 
       nodeHealth = some(health)
+    of "nodeState":
+      if nodeState.isSome():
+        reader.raiseUnexpectedField("Multiple `nodeState` fields found", "HealthReport")
+
+      let state = NodeHealthStatus.init(reader.readValue(string)).valueOr:
+        reader.raiseUnexpectedValue("Invalid `nodeState` value: " & $error)
+
+      nodeState = some(state)
     of "protocolsHealth":
       if protocolsHealth.isSome():
         reader.raiseUnexpectedField(
@@ -79,5 +89,8 @@ proc readValue*(
   if nodeHealth.isNone():
     reader.raiseUnexpectedValue("Field `nodeHealth` is missing")
 
-  value =
-    HealthReport(nodeHealth: nodeHealth.get, protocolsHealth: protocolsHealth.get(@[]))
+  value = HealthReport(
+    nodeHealth: nodeHealth.get,
+    nodeState: nodeState.get,
+    protocolsHealth: protocolsHealth.get(@[]),
+  )

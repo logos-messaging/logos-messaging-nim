@@ -30,6 +30,8 @@ import
 logScope:
   topics = "waku conf builder"
 
+const DefaultMaxConnections* = 150
+
 type MaxMessageSizeKind* = enum
   mmskNone
   mmskStr
@@ -247,9 +249,6 @@ proc withAgentString*(b: var WakuConfBuilder, agentString: string) =
 
 proc withColocationLimit*(b: var WakuConfBuilder, colocationLimit: int) =
   b.colocationLimit = some(colocationLimit)
-
-proc withMaxRelayPeers*(b: var WakuConfBuilder, maxRelayPeers: int) =
-  b.maxRelayPeers = some(maxRelayPeers)
 
 proc withRelayServiceRatio*(b: var WakuConfBuilder, relayServiceRatio: string) =
   b.relayServiceRatio = some(relayServiceRatio)
@@ -592,8 +591,13 @@ proc build*(
     if builder.maxConnections.isSome():
       builder.maxConnections.get()
     else:
-      warn "Max Connections was not specified, defaulting to 300"
-      300
+      warn "Max connections not specified, defaulting to DefaultMaxConnections",
+        default = DefaultMaxConnections
+      DefaultMaxConnections
+
+  if maxConnections < DefaultMaxConnections:
+    warn "max-connections less than DefaultMaxConnections; we suggest using DefaultMaxConnections or more for better connectivity",
+      provided = maxConnections, recommended = DefaultMaxConnections
 
   # TODO: Do the git version thing here
   let agentString = builder.agentString.get("nwaku")
@@ -663,7 +667,7 @@ proc build*(
     agentString: agentString,
     colocationLimit: colocationLimit,
     maxRelayPeers: builder.maxRelayPeers,
-    relayServiceRatio: builder.relayServiceRatio.get("60:40"),
+    relayServiceRatio: builder.relayServiceRatio.get("50:50"),
     rateLimit: rateLimit,
     circuitRelayClient: builder.circuitRelayClient.get(false),
     staticNodes: builder.staticNodes,

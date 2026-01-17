@@ -206,22 +206,17 @@ type WakuNodeConf* = object
     .}: bool
 
     maxConnections* {.
-      desc: "Maximum allowed number of libp2p connections.",
-      defaultValue: 50,
+      desc:
+        "Maximum allowed number of libp2p connections. (Default: 150) that's recommended value for better connectivity",
+      defaultValue: 150,
       name: "max-connections"
     .}: int
-
-    maxRelayPeers* {.
-      desc:
-        "Deprecated. Use relay-service-ratio instead. It represents the maximum allowed number of relay peers.",
-      name: "max-relay-peers"
-    .}: Option[int]
 
     relayServiceRatio* {.
       desc:
         "This percentage ratio represents the relay peers to service peers. For example, 60:40, tells that 60% of the max-connections will be used for relay protocol and the other 40% of max-connections will be reserved for other service protocols (e.g., filter, lightpush, store, metadata, etc.)",
-      name: "relay-service-ratio",
-      defaultValue: "60:40" # 60:40 ratio of relay to service peers
+      defaultValue: "50:50",
+      name: "relay-service-ratio"
     .}: string
 
     colocationLimit* {.
@@ -956,9 +951,6 @@ proc toWakuConf*(n: WakuNodeConf): ConfResult[WakuConf] =
   b.withExtMultiAddrs(n.extMultiAddrs)
   b.withExtMultiAddrsOnly(n.extMultiAddrsOnly)
   b.withMaxConnections(n.maxConnections)
-
-  if n.maxRelayPeers.isSome():
-    b.withMaxRelayPeers(n.maxRelayPeers.get())
 
   if n.relayServiceRatio != "":
     b.withRelayServiceRatio(n.relayServiceRatio)

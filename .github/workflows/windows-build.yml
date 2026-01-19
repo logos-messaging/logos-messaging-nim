@@ -44,6 +44,8 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-llvm
           mingw-w64-x86_64-clang
+          mingw-w64-x86_64-nim
+          mingw-w64-x86_64-nimble
 
     - name: Install Nim
       uses: iffy/install-nim@v5

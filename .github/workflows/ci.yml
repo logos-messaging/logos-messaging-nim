@@ -124,6 +124,8 @@ jobs:
         uses: iffy/install-nim@v5
         with:
           version: binary:2.2.6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache nimble packages
         uses: actions/cache@v4
@@ -199,6 +201,8 @@ jobs:
         uses: iffy/install-nim@v5
         with:
           version: binary:2.2.6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build nph
         run: |

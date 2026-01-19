@@ -33,7 +33,6 @@ jobs:
           make
           cmake
           upx
-          mingw-w64-x86_64-nim
           mingw-w64-x86_64-rust
           mingw-w64-x86_64-postgresql
           mingw-w64-x86_64-gcc
@@ -45,8 +44,15 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-llvm
           mingw-w64-x86_64-clang
-      
-    - name: Add UPX to PATH
+
+    - name: Install Nim
+      uses: iffy/install-nim@v5
+      with:
+        version: binary:2.2.6
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Add paths
       run: |
         echo "/usr/bin:$PATH" >> $GITHUB_PATH
         echo "/mingw64/bin:$PATH" >> $GITHUB_PATH

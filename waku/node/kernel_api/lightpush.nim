@@ -250,23 +250,22 @@ proc lightpushPublish*(
   if not node.wakuMix.isNil():
     lmixify = true
 
-  let
     #[     error "failed to publish message using mix as mix protocol is not mounted"
     return lighpushErrorResult(
       LightPushErrorCode.SERVICE_NOT_AVAILABLE, "Waku lightpush with mix not available"
     ) ]#
-    toPeer: RemotePeerInfo = peerOpt.valueOr:
-      if not node.wakuLightPush.isNil():
-        RemotePeerInfo.init(node.peerId())
-      elif not node.wakuLightpushClient.isNil():
-        node.peerManager.selectPeer(WakuLightPushCodec).valueOr:
-          let msg = "no suitable remote peers"
-          error "failed to publish message", msg = msg
-          return lighpushErrorResult(LightPushErrorCode.NO_PEERS_TO_RELAY, msg)
-      else:
-        return lighpushErrorResult(
-          LightPushErrorCode.NO_PEERS_TO_RELAY, "no suitable remote peers"
-        )
+  let toPeer: RemotePeerInfo = peerOpt.valueOr:
+    if not node.wakuLightPush.isNil():
+      RemotePeerInfo.init(node.peerId())
+    elif not node.wakuLightpushClient.isNil():
+      node.peerManager.selectPeer(WakuLightPushCodec).valueOr:
+        let msg = "no suitable remote peers"
+        error "failed to publish message", msg = msg
+        return lighpushErrorResult(LightPushErrorCode.NO_PEERS_TO_RELAY, msg)
+    else:
+      return lighpushErrorResult(
+        LightPushErrorCode.NO_PEERS_TO_RELAY, "no suitable remote peers"
+      )
 
   let pubsubForPublish = pubSubTopic.valueOr:
     if node.wakuAutoSharding.isNone():

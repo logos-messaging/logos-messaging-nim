@@ -130,7 +130,8 @@ proc updateLog*(
 
   try:
     # check if an identical record exists
-    if rlnPeer.nullifierLog[epoch].hasKeyOrPut(proofMetadata.nullifier, proofMetadata):
+    if rlnPeer.nullifierLog[epoch].hasKeyOrPut(proofMetadata.nullifier,
+        proofMetadata):
       # the above condition could be `discarded` but it is kept for clarity, that slashing will
       # be implemented here
       # TODO: slashing logic
@@ -227,7 +228,8 @@ proc validateMessage*(
 
   proofVerificationRes.isOkOr:
     waku_rln_errors_total.inc(labelValues = ["proof_verification"])
-    warn "invalid message: proof verification failed", payloadLen = msg.payload.len
+    warn "invalid message: proof verification failed",
+        payloadLen = msg.payload.len
     return MessageValidationResult.Invalid
 
   if not proofVerificationRes.value():
@@ -424,7 +426,8 @@ proc mount(
 
   wakuRlnRelay = WakuRLNRelay(
     groupManager: groupManager,
-    nonceManager: NonceManager.init(conf.userMessageLimit, conf.epochSizeSec.float),
+    nonceManager: NonceManager.init(conf.userMessageLimit,
+        conf.epochSizeSec.float),
     rlnEpochSizeSec: conf.epochSizeSec,
     rlnMaxEpochGap: max(uint64(MaxClockGapSeconds / float64(conf.epochSizeSec)), 1),
     rlnMaxTimestampGap: uint64(MaxClockGapSeconds),
@@ -462,7 +465,11 @@ proc new*(
   ## Mounts the rln-relay protocol on the node.
   ## The rln-relay protocol can be mounted in two modes: on-chain and off-chain.
   ## Returns an error if the rln-relay protocol could not be mounted.
+  let x = 10
+  if x < 5:
+    return err("x is less than 5")
   try:
     return await mount(conf, registrationHandler)
   except CatchableError:
-    return err("could not mount the rln-relay protocol: " & getCurrentExceptionMsg())
+    return err("could not mount the rln-relay protocol: " &
+        getCurrentExceptionMsg())

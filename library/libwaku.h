@@ -85,7 +85,8 @@ extern "C"
   int waku_relay_subscribe(void *ctx,
                            FFICallBack callback,
                            void *userData,
-                           const char *pubSubTopic);
+                           const char *pubSubTopic,
+                           const char *contentTopic);
 
   int waku_relay_add_protected_shard(void *ctx,
                                      FFICallBack callback,
@@ -97,7 +98,8 @@ extern "C"
   int waku_relay_unsubscribe(void *ctx,
                              FFICallBack callback,
                              void *userData,
-                             const char *pubSubTopic);
+                             const char *pubSubTopic,
+                             const char *contentTopic);
 
   int waku_filter_subscribe(void *ctx,
                             FFICallBack callback,

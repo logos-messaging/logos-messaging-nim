@@ -61,7 +61,7 @@ waku.nims:
 
 update: | waku.nims
 	git submodule update --init --recursive
-	nimble setup
+	nimble setup -y
 	$(MAKE) build-nph
 
 clean:

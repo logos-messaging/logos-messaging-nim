@@ -66,7 +66,7 @@ jobs:
       - name: Install Nim
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.6
+          version: binary:2.2.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -123,7 +123,7 @@ jobs:
       - name: Install Nim
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.6
+          version: binary:2.2.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -200,7 +200,7 @@ jobs:
       - name: Install Nim
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.6
+          version: binary:2.2.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -50,7 +50,7 @@ jobs:
         if: ${{ steps.secrets.outcome == 'success' }}
         uses: iffy/install-nim@v5
         with:
-          version: binary:2.2.6
+          version: binary:2.2.4
 
       - name: Cache nimble packages
         if: ${{ steps.secrets.outcome == 'success' }}

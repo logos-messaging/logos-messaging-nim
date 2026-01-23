@@ -7,7 +7,9 @@
   };
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs?rev=f44bd8ca21e026135061a0a57dcf3d0775b67a49";
+    # We are pinning the commit because ultimately we want to use same commit across different projects.
+    # A commit from nixpkgs 24.11 release : https://github.com/NixOS/nixpkgs/tree/release-24.11
+    nixpkgs.url = "github:NixOS/nixpkgs/0ef228213045d2cdb5a169a95d63ded38670b293";
     zerokit = {
       url = "github:vacp2p/zerokit?rev=dc0b31752c91e7b4fefc441cfa6a8210ad7dba7b";
       inputs.nixpkgs.follows = "nixpkgs";

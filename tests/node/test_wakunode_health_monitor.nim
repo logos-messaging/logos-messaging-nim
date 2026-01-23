@@ -14,6 +14,8 @@ import
     node/health_monitor/node_health_monitor,
     node/kernel_api/relay,
     node/kernel_api/store,
+    node/kernel_api/lightpush,
+    node/kernel_api/filter,
     waku_archive,
   ]
 
@@ -138,7 +140,7 @@ suite "Health Monitor - health state calculation":
     check state == NodeHealthStatus.Connected
 
 suite "Health Monitor - events":
-  asyncTest "verify onNodeHealthChange callback is triggered":
+  asyncTest "Core (relay) health update":
     let
       nodeAKey = generateSecp256k1Key()
       nodeA = newTestWakuNode(nodeAKey, parseIpAddress("127.0.0.1"), Port(0))
@@ -230,3 +232,92 @@ suite "Health Monitor - events":
 
     await monitorA.stopHealthMonitor()
     await nodeA.stop()
+
+  asyncTest "Edge (light client) health update":
+    let
+      nodeAKey = generateSecp256k1Key()
+      nodeA = newTestWakuNode(nodeAKey, parseIpAddress("127.0.0.1"), Port(0))
+
+    nodeA.mountLightpushClient()
+    await nodeA.mountFilterClient()
+    nodeA.mountStoreClient()
+
+    await nodeA.start()
+
+    let monitorA = NodeHealthMonitor.new()
+    monitorA.setNodeToHealthMonitor(nodeA)
+
+    var
+      lastStatus = NodeHealthStatus.Disconnected
+      callbackCount = 0
+      healthChangeSignal = newFuture[void]()
+
+    monitorA.onNodeHealthChange = proc(status: NodeHealthStatus) {.async.} =
+      lastStatus = status
+      callbackCount.inc()
+      if not healthChangeSignal.finished:
+        healthChangeSignal.complete()
+
+    monitorA.startHealthMonitor().expect("Health monitor failed to start")
+
+    let
+      nodeBKey = generateSecp256k1Key()
+      nodeB = newTestWakuNode(nodeBKey, parseIpAddress("127.0.0.1"), Port(0))
+
+    let driver = newSqliteArchiveDriver()
+    nodeB.mountArchive(driver).expect("Node B failed to mount archive")
+
+    (await nodeB.mountRelay()).expect("Node B failed to mount relay")
+
+    (await nodeB.mountLightpush()).expect("Node B failed to mount lightpush")
+    await nodeB.mountFilter()
+    await nodeB.mountStore()
+
+    await nodeB.start()
+
+    await nodeA.connectToNodes(@[nodeB.switch.peerInfo.toRemotePeerInfo()])
+
+    let connectTimeLimit = Moment.now() + 10.seconds
+    var gotConnected = false
+
+    while Moment.now() < connectTimeLimit:
+      if lastStatus == NodeHealthStatus.PartiallyConnected:
+        gotConnected = true
+        break
+
+      if healthChangeSignal.finished:
+        healthChangeSignal = newFuture[void]()
+
+      discard await healthChangeSignal.withTimeout(connectTimeLimit - Moment.now())
+
+    check:
+      gotConnected == true
+      callbackCount >= 1
+      lastStatus == NodeHealthStatus.PartiallyConnected
+
+    if healthChangeSignal.finished:
+      healthChangeSignal = newFuture[void]()
+
+    await nodeB.stop()
+    await nodeA.disconnectNode(nodeB.switch.peerInfo.toRemotePeerInfo())
+
+    let disconnectTimeLimit = Moment.now() + 10.seconds
+    var gotDisconnected = false
+
+    while Moment.now() < disconnectTimeLimit:
+      if lastStatus == NodeHealthStatus.Disconnected:
+        gotDisconnected = true
+        break
+
+      if healthChangeSignal.finished:
+        healthChangeSignal = newFuture[void]()
+
+      discard await healthChangeSignal.withTimeout(disconnectTimeLimit - Moment.now())
+
+    check:
+      gotDisconnected == true
+      lastStatus == NodeHealthStatus.Disconnected
+
+    await monitorA.stopHealthMonitor()
+    await nodeA.stop()
+

@@ -4,7 +4,9 @@ import
   std/[options, sets, random, sequtils, json, strutils, tables],
   chronos,
   chronicles,
-  libp2p/protocols/rendezvous
+  libp2p/protocols/rendezvous,
+  libp2p/protocols/pubsub,
+  libp2p/protocols/pubsub/rpc/messages
 
 import
   ../waku_node,
@@ -40,11 +42,13 @@ type
     onlineMonitor*: OnlineMonitor
     keepAliveFut: Future[void]
     healthLoopFut: Future[void]
+    healthUpdateEvent: AsyncEvent
     nodeState: NodeHealthStatus
     lastState: NodeHealthStatus
     onNodeHealthChange*: NodeHealthChangeHandler
     cachedProtocols: seq[ProtocolHealth]
     strength: Table[WakuProtocol, int]
+    relayObserver: PubSubObserver
 
 func getHealth*(report: HealthReport, kind: WakuProtocol): ProtocolHealth =
   for h in report.protocolsHealth:
@@ -52,6 +56,16 @@ func getHealth*(report: HealthReport, kind: WakuProtocol): ProtocolHealth =
       return h
   # Shouldn't happen, but if it does, then assume protocol is not mounted
   return ProtocolHealth.init(kind)
+
+proc countConnectedPeers(hm: NodeHealthMonitor, codec: string): int =
+  if isNil(hm.node) or isNil(hm.node.peerManager):
+    return 0
+
+  var peerCount = 0
+  for remotePeerInfo in hm.node.peerManager.switch.peerStore.peers(codec):
+    if hm.node.peerManager.switch.isConnected(remotePeerInfo.peerId):
+      peerCount.inc()
+  return peerCount
 
 template checkWakuNodeNotNil(node: WakuNode, p: ProtocolHealth): untyped =
   if isNil(node):
@@ -120,7 +134,7 @@ proc getLightpushHealth(
     hm.strength[WakuProtocol.LightpushProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(WakuLightPushCodec).len
+  let peerCount = countConnectedPeers(hm, WakuLightPushCodec)
   hm.strength[WakuProtocol.LightpushProtocol] = peerCount
 
   if relayHealth == HealthStatus.READY:
@@ -138,8 +152,7 @@ proc getLegacyLightpushHealth(
     hm.strength[WakuProtocol.LegacyLightpushProtocol] = 0
     return p.notMounted()
 
-  let peerCount =
-    hm.node.peerManager.switch.peerStore.peers(WakuLegacyLightPushCodec).len
+  let peerCount = countConnectedPeers(hm, WakuLegacyLightPushCodec)
   hm.strength[WakuProtocol.LegacyLightpushProtocol] = peerCount
 
   if relayHealth == HealthStatus.READY:
@@ -155,8 +168,7 @@ proc getFilterHealth(hm: NodeHealthMonitor, relayHealth: HealthStatus): Protocol
     hm.strength[WakuProtocol.FilterProtocol] = 0
     return p.notMounted()
 
-  let peerCount =
-    hm.node.peerManager.switch.peerStore.peers(WakuFilterSubscribeCodec).len
+  let peerCount = countConnectedPeers(hm, WakuFilterSubscribeCodec)
   hm.strength[WakuProtocol.FilterProtocol] = peerCount
 
   if relayHealth == HealthStatus.READY:
@@ -172,7 +184,7 @@ proc getStoreHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.StoreProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(WakuStoreCodec).len
+  let peerCount = countConnectedPeers(hm, WakuStoreCodec)
   hm.strength[WakuProtocol.StoreProtocol] = peerCount
   return p.ready()
 
@@ -196,7 +208,7 @@ proc getLightpushClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.LightpushClientProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(WakuLightPushCodec).len
+  let peerCount = countConnectedPeers(hm, WakuLightPushCodec)
   hm.strength[WakuProtocol.LightpushClientProtocol] = peerCount
 
   if peerCount > 0:
@@ -211,8 +223,7 @@ proc getLegacyLightpushClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.LegacyLightpushClientProtocol] = 0
     return p.notMounted()
 
-  let peerCount =
-    hm.node.peerManager.switch.peerStore.peers(WakuLegacyLightPushCodec).len
+  let peerCount = countConnectedPeers(hm, WakuLegacyLightPushCodec)
   hm.strength[WakuProtocol.LegacyLightpushClientProtocol] = peerCount
 
   if peerCount > 0:
@@ -226,8 +237,7 @@ proc getFilterClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.FilterClientProtocol] = 0
     return p.notMounted()
 
-  let peerCount =
-    hm.node.peerManager.switch.peerStore.peers(WakuFilterSubscribeCodec).len
+  let peerCount = countConnectedPeers(hm, WakuFilterSubscribeCodec)
   hm.strength[WakuProtocol.FilterClientProtocol] = peerCount
 
   if peerCount > 0:
@@ -242,7 +252,7 @@ proc getStoreClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.StoreClientProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(WakuStoreCodec).len
+  let peerCount = countConnectedPeers(hm, WakuStoreCodec)
   hm.strength[WakuProtocol.StoreClientProtocol] = peerCount
 
   if peerCount > 0 or hm.node.wakuStore != nil:
@@ -260,7 +270,7 @@ proc getLegacyStoreClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.LegacyStoreClientProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(WakuLegacyStoreCodec).len
+  let peerCount = countConnectedPeers(hm, WakuLegacyStoreCodec)
   hm.strength[WakuProtocol.LegacyStoreClientProtocol] = peerCount
 
   if peerCount > 0 or hm.node.wakuLegacyStore != nil:
@@ -278,7 +288,7 @@ proc getPeerExchangeHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.PeerExchangeProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(WakuPeerExchangeCodec).len
+  let peerCount = countConnectedPeers(hm, WakuPeerExchangeCodec)
   hm.strength[WakuProtocol.PeerExchangeProtocol] = peerCount
 
   return p.ready()
@@ -291,7 +301,7 @@ proc getRendezvousHealth(hm: NodeHealthMonitor): ProtocolHealth =
     hm.strength[WakuProtocol.RendezvousProtocol] = 0
     return p.notMounted()
 
-  let peerCount = hm.node.peerManager.switch.peerStore.peers(RendezVousCodec).len
+  let peerCount = countConnectedPeers(hm, RendezVousCodec)
   hm.strength[WakuProtocol.RendezvousProtocol] = peerCount
   if peerCount == 0:
     return p.notReady("No Rendezvous peers are available yet")
@@ -424,24 +434,48 @@ proc getNodeHealthReport*(hm: NodeHealthMonitor): Future[HealthReport] {.async.}
   report.nodeState = hm.nodeState
   return report
 
+proc onPeerEvent(
+    hm: NodeHealthMonitor, peerId: PeerId, event: PeerEvent
+) {.async.} =
+  case event.kind
+  of PeerEventKind.Joined, PeerEventKind.Left, PeerEventKind.Identified:
+    # recomputing node health when peer connection events of interest trigger
+    hm.healthUpdateEvent.fire()
+  else:
+    discard
+
+proc onRelayMsg(
+    hm: NodeHealthMonitor, peer: PubSubPeer, msg: var RPCMsg
+) {.gcsafe, raises: [].} =
+  if msg.subscriptions.len == 0:
+    if msg.control.isNone():
+      return
+    let ctrl = msg.control.get()
+    if ctrl.graft.len == 0 and ctrl.prune.len == 0:
+      return
+
+  # recomputing node health when peer relay events of interest trigger
+  hm.healthUpdateEvent.fire()
+
 proc healthLoop(hm: NodeHealthMonitor) {.async.} =
-  # Periodically updates hm.nodeState and hm.cachedProtocols
-  # TODO: Convert the node health monitor into an event-driven component
   while true:
-    hm.cachedProtocols = await hm.getAllProtocolHealthInfo()
-    let newState = hm.calculateConnectionState()
+    try:
+      await hm.healthUpdateEvent.wait()
+      hm.healthUpdateEvent.clear()
 
-    if newState != hm.lastState:
-      hm.lastState = newState
-      hm.nodeState = newState
+      hm.cachedProtocols = await hm.getAllProtocolHealthInfo()
+      let newState = hm.calculateConnectionState()
 
-      if not isNil(hm.onNodeHealthChange):
-        try:
+      if newState != hm.lastState:
+        hm.lastState = newState
+        hm.nodeState = newState
+
+        if not isNil(hm.onNodeHealthChange):
           await hm.onNodeHealthChange(newState)
-        except Exception as e:
-          error "Node health status callback failed", msg = e.msg
-
-    await sleepAsync(1.seconds)
+    except CancelledError:
+      break
+    except Exception as e:
+      error "HealthMonitor: error in update loop", error = e.msg
 
 proc selectRandomPeersForKeepalive(
     node: WakuNode, outPeers: seq[PeerId], numRandomPeers: int
@@ -591,8 +625,35 @@ proc setOverallHealth*(hm: NodeHealthMonitor, health: HealthStatus) =
 proc startHealthMonitor*(hm: NodeHealthMonitor): Result[void, string] =
   hm.onlineMonitor.startOnlineMonitor()
 
-  if isNil(hm.healthLoopFut):
-    hm.healthLoopFut = hm.healthLoop()
+  if isNil(hm.node):
+    return err("startHealthMonitor: no node to monitor")
+
+  if isNil(hm.node.peerManager):
+    return err("startHealthMonitor: no node peerManager to monitor")
+
+  if not isNil(hm.node.wakuRelay):
+    hm.relayObserver = PubSubObserver(
+      onRecv: proc(peer: PubSubPeer, msgs: var RPCMsg) {.gcsafe, raises: [].} =
+        hm.onRelayMsg(peer, msgs)
+    )
+    hm.node.wakuRelay.addObserver(hm.relayObserver)
+
+  proc handlePeerEvent(
+      peerId: PeerId, event: PeerEvent
+  ): Future[void] {.gcsafe, async: (raises: [CancelledError]).} =
+    try:
+      await hm.onPeerEvent(peerId, event)
+    except:
+      error "exception in health monitor onPeerEvent: " & getCurrentExceptionMsg()
+
+  hm.node.peerManager.addExtPeerEventHandler(handlePeerEvent, PeerEventKind.Joined)
+  hm.node.peerManager.addExtPeerEventHandler(handlePeerEvent, PeerEventKind.Left)
+  hm.node.peerManager.addExtPeerEventHandler(handlePeerEvent, PeerEventKind.Identified)
+
+  hm.healthUpdateEvent = newAsyncEvent()
+  hm.healthUpdateEvent.fire()
+
+  hm.healthLoopFut = hm.healthLoop()
 
   hm.startKeepalive().isOkOr:
     return err("startHealthMonitor: failed starting keep alive: " & error)
@@ -607,6 +668,9 @@ proc stopHealthMonitor*(hm: NodeHealthMonitor) {.async.} =
 
   if not isNil(hm.healthLoopFut):
     await hm.healthLoopFut.cancelAndWait()
+
+  if not isNil(hm.node.wakuRelay) and not isNil(hm.relayObserver):
+    hm.node.wakuRelay.removeObserver(hm.relayObserver)
 
 proc new*(
     T: type NodeHealthMonitor,

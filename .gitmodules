@@ -197,6 +197,6 @@
 	branch = master
 [submodule "vendor/mix-rln-spam-protection-plugin"]
 	path = vendor/mix-rln-spam-protection-plugin
-	url = https://github.com/status-im/mix-rln-spam-protection-plugin.git
+	url = https://github.com/logos-co/mix-rln-spam-protection-plugin.git
 	ignore = untracked
 	branch = master

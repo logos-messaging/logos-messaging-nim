@@ -8,12 +8,15 @@ import
   libp2p/protocols/mix/mix_node,
   libp2p/protocols/mix/mix_protocol,
   libp2p/protocols/mix/mix_metrics,
+  libp2p/protocols/mix/spam_protection,
   libp2p/[multiaddress, multicodec, peerid],
   eth/common/keys
 
 import
+  mix_rln_spam_protection,
   ../node/peer_manager,
   ../waku_core,
+  ../waku_relay,
   ../waku_enr,
   ../node/peer_manager/waku_peer_store,
   ../common/nimchronos
@@ -24,11 +27,17 @@ logScope:
 const minMixPoolSize = 4
 
 type
+  PublishMessage* = proc(message: WakuMessage): Future[Result[void, string]] {.
+    async, gcsafe, raises: []
+  .}
+
   WakuMix* = ref object of MixProtocol
     peerManager*: PeerManager
     clusterId: uint16
     nodePoolLoopHandle: Future[void]
     pubKey*: Curve25519Key
+    mixRlnSpamProtection*: MixRlnSpamProtection
+    publishMessage*: PublishMessage
 
   WakuMixResult*[T] = Result[T, string]
 
@@ -172,6 +181,7 @@ proc new*(
     clusterId: uint16,
     mixPrivKey: Curve25519Key,
     bootnodes: seq[MixNodePubInfo],
+    publishMessage: PublishMessage,
 ): WakuMixResult[T] =
   let mixPubKey = public(mixPrivKey)
   info "mixPubKey", mixPubKey = mixPubKey
@@ -187,15 +197,123 @@ proc new*(
 
   if len(initTable) < minMixPoolSize:
     warn "publishing with mix won't work until atleast  3 mix nodes in node pool"
-  var m = WakuMix(peerManager: peermgr, clusterId: clusterId, pubKey: mixPubKey)
-  procCall MixProtocol(m).init(localMixNodeInfo, initTable, peermgr.switch)
+
+  # Initialize spam protection with default config (ephemeral credentials)
+  let spamProtectionConfig = defaultConfig()
+  let spamProtection = newMixRlnSpamProtection(spamProtectionConfig).valueOr:
+    return err("failed to create spam protection: " & error)
+
+  var m = WakuMix(
+    peerManager: peermgr,
+    clusterId: clusterId,
+    pubKey: mixPubKey,
+    mixRlnSpamProtection: spamProtection,
+    publishMessage: publishMessage,
+  )
+  procCall MixProtocol(m).init(
+    localMixNodeInfo,
+    initTable,
+    peermgr.switch,
+    spamProtection = Opt.some(SpamProtection(spamProtection)),
+  )
   return ok(m)
 
-method start*(mix: WakuMix) =
+proc setupSpamProtectionCallbacks(mix: WakuMix) =
+  ## Set up the publish callback for spam protection coordination.
+  ## This enables the plugin to broadcast membership updates and proof metadata
+  ## via Waku relay.
+  if mix.publishMessage.isNil():
+    warn "PublishMessage callback not available, spam protection coordination disabled"
+    return
+
+  let publishCallback: PublishCallback = proc(
+      contentTopic: string, data: seq[byte]
+  ) {.async.} =
+    # Create a WakuMessage for the coordination data
+    let msg = WakuMessage(
+      payload: data,
+      contentTopic: contentTopic,
+      ephemeral: true, # Coordination messages don't need to be stored
+      timestamp: getNowInNanosecondTime(),
+    )
+
+    # Delegate to node's publish API which handles topic derivation and relay publishing
+    let res = await mix.publishMessage(msg)
+    if res.isErr():
+      warn "Failed to publish spam protection coordination message",
+        contentTopic = contentTopic, error = res.error
+      return
+
+    trace "Published spam protection coordination message", contentTopic = contentTopic
+
+  mix.mixRlnSpamProtection.setPublishCallback(publishCallback)
+  info "Spam protection publish callback configured"
+
+proc handleMessage*(
+    mix: WakuMix, pubsubTopic: PubsubTopic, message: WakuMessage
+) {.async, gcsafe.} =
+  ## Handle incoming messages for spam protection coordination.
+  ## This should be called from the relay handler for coordination content topics.
+  if mix.mixRlnSpamProtection.isNil():
+    return
+
+  let contentTopic = message.contentTopic
+
+  if contentTopic == mix.mixRlnSpamProtection.getMembershipContentTopic():
+    # Handle membership update
+    let res = await mix.mixRlnSpamProtection.handleMembershipUpdate(message.payload)
+    if res.isErr:
+      warn "Failed to handle membership update", error = res.error
+    else:
+      trace "Handled membership update"
+  elif contentTopic == mix.mixRlnSpamProtection.getProofMetadataContentTopic():
+    # Handle proof metadata for network-wide spam detection
+    let res = mix.mixRlnSpamProtection.handleProofMetadata(message.payload)
+    if res.isErr:
+      warn "Failed to handle proof metadata", error = res.error
+    else:
+      trace "Handled proof metadata"
+
+proc getSpamProtectionContentTopics*(mix: WakuMix): seq[string] =
+  ## Get the content topics used by spam protection for coordination.
+  ## Use these to set up relay subscriptions.
+  if mix.mixRlnSpamProtection.isNil():
+    return @[]
+  return mix.mixRlnSpamProtection.getContentTopics()
+
+method start*(mix: WakuMix) {.async.} =
   info "starting waku mix protocol"
+
+  # Initialize and start spam protection
+  if not mix.mixRlnSpamProtection.isNil():
+    let initRes = await mix.mixRlnSpamProtection.init()
+    if initRes.isErr:
+      error "Failed to initialize spam protection", error = initRes.error
+    else:
+      # Set up publish callback after init
+      mix.setupSpamProtectionCallbacks()
+
+      let startRes = await mix.mixRlnSpamProtection.start()
+      if startRes.isErr:
+        error "Failed to start spam protection", error = startRes.error
+      else:
+        # Register self in the membership tree
+        let regRes = await mix.mixRlnSpamProtection.registerSelf()
+        if regRes.isErr:
+          warn "Failed to register self in spam protection membership",
+            error = regRes.error
+        else:
+          info "Spam protection started and self registered",
+            membershipIndex = regRes.get()
+
   mix.nodePoolLoopHandle = mix.startMixNodePoolMgr()
 
 method stop*(mix: WakuMix) {.async.} =
+  # Stop spam protection
+  if not mix.mixRlnSpamProtection.isNil():
+    await mix.mixRlnSpamProtection.stop()
+    info "Spam protection stopped"
+
   if mix.nodePoolLoopHandle.isNil():
     return
   await mix.nodePoolLoopHandle.cancelAndWait()

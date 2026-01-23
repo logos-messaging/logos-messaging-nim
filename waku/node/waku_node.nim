@@ -145,9 +145,14 @@ proc deduceRelayShard(
   let pubsubTopic = pubsubTopicOp.valueOr:
     if node.wakuAutoSharding.isNone():
       return err("Pubsub topic must be specified when static sharding is enabled.")
-    node.wakuAutoSharding.get().getShard(contentTopic).valueOr:
-      let msg = "Deducing shard failed: " & error
-      return err(msg)
+    let shard = node.wakuAutoSharding.get().getShard(contentTopic).valueOr:
+        let msg = "Deducing shard failed: " & error
+        return err(msg)
+    return ok(shard)
+
+  let shard = RelayShard.parse(pubsubTopic).valueOr:
+    return err("Invalid topic:" & pubsubTopic & " " & $error)
+  return ok(shard)
 
 proc getShardsGetter(node: WakuNode): GetShards =
   return proc(): seq[uint16] {.closure, gcsafe, raises: [].} =

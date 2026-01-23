@@ -21,7 +21,7 @@ type DeliveryTask* = ref object
   errorDesc*: string
 
 proc create*(
-    T: type DeliveryTask,
+    T: typedesc[DeliveryTask],
     requestId: RequestId,
     envelop: MessageEnvelope,
     brokerCtx: BrokerContext,
@@ -31,6 +31,7 @@ proc create*(
   let relayShardRes = (
     RequestRelayShard.request(brokerCtx, none[PubsubTopic](), envelop.contentTopic)
   ).valueOr:
+    echo "RequestRelayShard.request error", $error
     return err($error)
 
   let pubsubTopic = relayShardRes.relayShard.toPubsubTopic()

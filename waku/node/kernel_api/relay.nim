@@ -30,6 +30,8 @@ import
   ../peer_manager,
   ../../waku_rln_relay
 
+export waku_relay.WakuRelayHandler
+
 declarePublicHistogram waku_histogram_message_size,
   "message size histogram in kB",
   buckets = [
@@ -91,6 +93,23 @@ proc registerRelayHandler(
 
   node.wakuRelay.subscribe(topic, uniqueTopicHandler)
 
+proc getTopicOfSubscriptionEvent(
+    node: WakuNode, subscription: SubscriptionEvent
+): Result[(PubsubTopic, Option[ContentTopic]), string] =
+  case subscription.kind
+  of ContentSub, ContentUnsub:
+    if node.wakuAutoSharding.isSome():
+      let shard = node.wakuAutoSharding.get().getShard((subscription.topic)).valueOr:
+          return err("Autosharding error: " & error)
+      return ok(($shard, some(subscription.topic)))
+    else:
+      return
+        err("Static sharding is used, relay subscriptions must specify a pubsub topic")
+  of PubsubSub, PubsubUnsub:
+    return ok((subscription.topic, none[ContentTopic]()))
+  else:
+    return err("Unsupported subscription type in relay getTopicOfSubscriptionEvent")
+
 proc subscribe*(
     node: WakuNode, subscription: SubscriptionEvent, handler: WakuRelayHandler
 ): Result[void, string] =
@@ -101,27 +120,15 @@ proc subscribe*(
     error "Invalid API call to `subscribe`. WakuRelay not mounted."
     return err("Invalid API call to `subscribe`. WakuRelay not mounted.")
 
-  let (pubsubTopic, contentTopicOp) =
-    case subscription.kind
-    of ContentSub:
-      if node.wakuAutoSharding.isSome():
-        let shard = node.wakuAutoSharding.get().getShard((subscription.topic)).valueOr:
-            error "Autosharding error", error = error
-            return err("Autosharding error: " & error)
-        ($shard, some(subscription.topic))
-      else:
-        return err(
-          "Static sharding is used, relay subscriptions must specify a pubsub topic"
-        )
-    of PubsubSub:
-      (subscription.topic, none(ContentTopic))
-    else:
-      return err("Unsupported subscription type in relay subscribe")
+  let (pubsubTopic, contentTopicOp) = getTopicOfSubscriptionEvent(node, subscription).valueOr:
+    error "Failed to decode subscription event", error = error
+    return err("Failed to decode subscription event: " & error)
 
   if node.wakuRelay.isSubscribed(pubsubTopic):
     warn "No-effect API call to subscribe. Already subscribed to topic", pubsubTopic
     return ok()
 
+  info "subscribe", pubsubTopic, contentTopicOp
   node.registerRelayHandler(pubsubTopic, handler)
   node.topicSubscriptionQueue.emit((kind: PubsubSub, topic: pubsubTopic))
 
@@ -136,22 +143,9 @@ proc unsubscribe*(
     error "Invalid API call to `unsubscribe`. WakuRelay not mounted."
     return err("Invalid API call to `unsubscribe`. WakuRelay not mounted.")
 
-  let (pubsubTopic, contentTopicOp) =
-    case subscription.kind
-    of ContentUnsub:
-      if node.wakuAutoSharding.isSome():
-        let shard = node.wakuAutoSharding.get().getShard((subscription.topic)).valueOr:
-            error "Autosharding error", error = error
-            return err("Autosharding error: " & error)
-        ($shard, some(subscription.topic))
-      else:
-        return err(
-          "Static sharding is used, relay subscriptions must specify a pubsub topic"
-        )
-    of PubsubUnsub:
-      (subscription.topic, none(ContentTopic))
-    else:
-      return err("Unsupported subscription type in relay unsubscribe")
+  let (pubsubTopic, contentTopicOp) = getTopicOfSubscriptionEvent(node, subscription).valueOr:
+    error "Failed to decode unsubscribe event", error = error
+    return err("Failed to decode unsubscribe event: " & error)
 
   if not node.wakuRelay.isSubscribed(pubsubTopic):
     warn "No-effect API call to `unsubscribe`. Was not subscribed", pubsubTopic
@@ -162,6 +156,19 @@ proc unsubscribe*(
   node.topicSubscriptionQueue.emit((kind: PubsubUnsub, topic: pubsubTopic))
 
   return ok()
+
+proc isSubscribed*(
+    node: WakuNode, subscription: SubscriptionEvent
+): Result[bool, string] =
+  if node.wakuRelay.isNil():
+    error "Invalid API call to `isSubscribed`. WakuRelay not mounted."
+    return err("Invalid API call to `isSubscribed`. WakuRelay not mounted.")
+
+  let (pubsubTopic, contentTopicOp) = getTopicOfSubscriptionEvent(node, subscription).valueOr:
+    error "Failed to decode subscription event", error = error
+    return err("Failed to decode subscription event: " & error)
+
+  return ok(node.wakuRelay.isSubscribed(pubsubTopic))
 
 proc publish*(
     node: WakuNode, pubsubTopicOp: Option[PubsubTopic], message: WakuMessage

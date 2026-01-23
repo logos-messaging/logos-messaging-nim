@@ -3,6 +3,7 @@ import chronicles, chronos, results
 import waku/factory/waku
 import waku/[requests/health_request, waku_core, waku_node]
 import waku/node/delivery_service/send_service
+import waku/node/delivery_service/subscription_service
 import ./[api_conf, types]
 
 logScope:
@@ -32,10 +33,22 @@ proc checkApiAvailability(w: Waku): Result[void, string] =
     warn "Failed to get Waku node health status: ", error = healthStatus.error
     # Let's suppose the node is hesalthy enough, go ahead
   else:
-    if healthStatus.get().healthStatus != NodeHealth.Unhealthy:
+    if healthStatus.get().healthStatus == NodeHealth.Unhealthy:
       return err("Waku node is not healthy, has got no connections.")
 
   return ok()
+
+proc subscribe*(
+    w: Waku, contentTopic: ContentTopic
+): Future[Result[void, string]] {.async.} =
+  ?checkApiAvailability(w)
+
+  return w.deliveryService.subscriptionService.subscribe(contentTopic)
+
+proc unsubscribe*(w: Waku, contentTopic: ContentTopic): Result[void, string] =
+  ?checkApiAvailability(w)
+
+  return w.deliveryService.subscriptionService.unsubscribe(contentTopic)
 
 proc send*(
     w: Waku, envelope: MessageEnvelope
@@ -45,7 +58,13 @@ proc send*(
   let requestId = newRequestId(w.rng)
 
   let deliveryTask = DeliveryTask.create(requestId, envelope, w.brokerCtx).valueOr:
-    return err("Failed to create delivery task: " & error)
+    return err("API send: Failed to create delivery task: " & error)
+
+  info "API send: scheduling delivery task",
+    requestId = $requestId,
+    pubsubTopic = deliveryTask.pubsubTopic,
+    contentTopic = deliveryTask.msg.contentTopic,
+    msgHash = deliveryTask.msgHash.shortLog()
 
   asyncSpawn w.deliveryService.sendService.send(deliveryTask)
 

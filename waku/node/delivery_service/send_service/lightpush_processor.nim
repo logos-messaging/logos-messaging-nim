@@ -2,10 +2,9 @@ import chronicles, chronos, results
 import std/options
 
 import
-  waku/waku_node,
-  waku/waku_core,
   waku/node/peer_manager,
-  waku/waku_lightpush/[callbacks, common, client, rpc],
+  waku/waku_core,
+  waku/waku_lightpush/[common, client, rpc],
   waku/common/broker/broker_context
 
 import ./[delivery_task, send_processor]
@@ -18,7 +17,7 @@ type LightpushSendProcessor* = ref object of BaseSendProcessor
   lightpushClient: WakuLightPushClient
 
 proc new*(
-    T: type LightpushSendProcessor,
+    T: typedesc[LightpushSendProcessor],
     peerManager: PeerManager,
     lightpushClient: WakuLightPushClient,
     brokerCtx: BrokerContext,
@@ -41,7 +40,9 @@ method sendImpl*(
 ): Future[void] {.async.} =
   task.tryCount.inc()
   info "Trying message delivery via Lightpush",
-    requestId = task.requestId, msgHash = task.msgHash, tryCount = task.tryCount
+    requestId = task.requestId,
+    msgHash = task.msgHash.to0xHex(),
+    tryCount = task.tryCount
 
   let peer = self.peerManager.selectPeer(WakuLightPushCodec, some(task.pubsubTopic)).valueOr:
     task.state = DeliveryState.NextRoundRetry

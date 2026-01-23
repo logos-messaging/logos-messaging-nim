@@ -1,6 +1,6 @@
 import chronos, chronicles
 import std/options
-import waku/[waku_node, waku_core], waku/waku_lightpush/[common, callbacks, rpc]
+import waku/[waku_core], waku/waku_lightpush/[common, rpc]
 import waku/requests/health_request
 import waku/common/broker/broker_context
 import waku/api/types
@@ -33,36 +33,42 @@ proc new*(
 
 proc isTopicHealthy(self: RelaySendProcessor, topic: PubsubTopic): bool {.gcsafe.} =
   let healthReport = RequestRelayTopicsHealth.request(self.brokerCtx, @[topic]).valueOr:
+    error "isTopicHealthy: failed to get health report", topic = topic, error = error
     return false
 
   if healthReport.topicHealth.len() < 1:
+    warn "isTopicHealthy: no topic health entries", topic = topic
     return false
   let health = healthReport.topicHealth[0].health
+  debug "isTopicHealthy: topic health is ", topic = topic, health = health
   return health == MINIMALLY_HEALTHY or health == SUFFICIENTLY_HEALTHY
 
 method isValidProcessor*(
     self: RelaySendProcessor, task: DeliveryTask
 ): bool {.gcsafe.} =
-  return self.isTopicHealthy(task.pubsubTopic)
+  # Topic health query is not reliable enough after a fresh subscribe...
+  # return self.isTopicHealthy(task.pubsubTopic)
+  return true
 
 method sendImpl*(self: RelaySendProcessor, task: DeliveryTask): Future[void] {.async.} =
   task.tryCount.inc()
   info "Trying message delivery via Relay",
-    requestId = task.requestId, msgHash = task.msgHash, tryCount = task.tryCount
+    requestId = task.requestId,
+    msgHash = task.msgHash.to0xHex(),
+    tryCount = task.tryCount
 
-  let pushResult = await self.publishProc(task.pubsubTopic, task.msg)
-  if pushResult.isErr():
-    let errorMessage = pushResult.error.desc.get($pushResult.error.code)
+  let noOfPublishedPeers = (await self.publishProc(task.pubsubTopic, task.msg)).valueOr:
+    let errorMessage = error.desc.get($error.code)
     error "Failed to publish message with relay",
       request = task.requestId, msgHash = task.msgHash, error = errorMessage
-    if pushResult.error.code != LightPushErrorCode.NO_PEERS_TO_RELAY:
+    if error.code != LightPushErrorCode.NO_PEERS_TO_RELAY:
       task.state = DeliveryState.FailedToDeliver
       task.errorDesc = errorMessage
     else:
       task.state = self.fallbackStateToSet
     return
 
-  if pushResult.isOk and pushResult.get() > 0:
+  if noOfPublishedPeers > 0:
     info "Message propagated via Relay",
       requestId = task.requestId, msgHash = task.msgHash
     task.state = DeliveryState.SuccessfullyPropagated

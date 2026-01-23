@@ -5,18 +5,17 @@ import std/[sequtils, tables, options]
 import chronos, chronicles, libp2p/utility
 import
   ./[send_processor, relay_processor, lightpush_processor, delivery_task],
+  ../[subscription_service],
   waku/[
     waku_core,
     node/waku_node,
     node/peer_manager,
     waku_store/client,
     waku_store/common,
-    waku_archive/archive,
     waku_relay/protocol,
     waku_rln_relay/rln_relay,
     waku_lightpush/client,
     waku_lightpush/callbacks,
-    events/delivery_events,
     events/message_events,
     common/broker/broker_context,
   ]
@@ -59,6 +58,7 @@ type SendService* = ref object of RootObj
 
   node: WakuNode
   checkStoreForMessages: bool
+  subscriptionService: SubscriptionService
 
 proc setupSendProcessorChain(
     peerManager: PeerManager,
@@ -88,14 +88,14 @@ proc setupSendProcessorChain(
     processors.add(LightpushSendProcessor.new(peerManager, lightpushClient, brokerCtx))
 
   var currentProcessor: BaseSendProcessor = processors[0]
-  for i in 1 ..< processors.len():
+  for i in 1 ..< processors.len:
     currentProcessor.chain(processors[i])
     currentProcessor = processors[i]
 
   return ok(processors[0])
 
 proc new*(
-    T: type SendService, preferP2PReliability: bool, w: WakuNode
+    T: type SendService, preferP2PReliability: bool, w: WakuNode, s: SubscriptionService
 ): Result[T, string] =
   if w.wakuRelay.isNil() and w.wakuLightpushClient.isNil():
     return err(
@@ -116,6 +116,7 @@ proc new*(
     sendProcessor: sendProcessorChain,
     node: w,
     checkStoreForMessages: checkStoreForMessages,
+    subscriptionService: s,
   )
 
   return ok(sendService)
@@ -173,18 +174,21 @@ proc reportTaskResult(self: SendService, task: DeliveryTask) =
   of DeliveryState.SuccessfullyPropagated:
     # TODO: in case of of unable to strore check messages shall we report success instead?
     info "Message successfully propagated",
-      requestId = task.requestId, msgHash = task.msgHash
-    MessagePropagatedEvent.emit(self.brokerCtx, task.requestId, task.msgHash.toString())
+      requestId = task.requestId, msgHash = task.msgHash.to0xHex()
+    MessagePropagatedEvent.emit(self.brokerCtx, task.requestId, task.msgHash.to0xHex())
     return
   of DeliveryState.SuccessfullyValidated:
-    info "Message successfully sent", requestId = task.requestId, msgHash = task.msgHash
-    MessageSentEvent.emit(self.brokerCtx, task.requestId, task.msgHash.toString())
+    info "Message successfully sent",
+      requestId = task.requestId, msgHash = task.msgHash.to0xHex()
+    MessageSentEvent.emit(self.brokerCtx, task.requestId, task.msgHash.to0xHex())
     return
   of DeliveryState.FailedToDeliver:
     error "Failed to send message",
-      requestId = task.requestId, msgHash = task.msgHash, error = task.errorDesc
+      requestId = task.requestId,
+      msgHash = task.msgHash.to0xHex(),
+      error = task.errorDesc
     MessageErrorEvent.emit(
-      self.brokerCtx, task.requestId, task.msgHash.toString(), task.errorDesc
+      self.brokerCtx, task.requestId, task.msgHash.to0xHex(), task.errorDesc
     )
     return
   else:
@@ -193,19 +197,22 @@ proc reportTaskResult(self: SendService, task: DeliveryTask) =
 
   if task.messageAge() > MaxTimeInCache:
     error "Failed to send message",
-      requestId = task.requestId, msgHash = task.msgHash, error = "Message too old"
+      requestId = task.requestId,
+      msgHash = task.msgHash.to0xHex(),
+      error = "Message too old",
+      age = task.messageAge()
     task.state = DeliveryState.FailedToDeliver
     MessageErrorEvent.emit(
       self.brokerCtx,
       task.requestId,
-      task.msgHash.toString(),
+      task.msgHash.to0xHex(),
       "Unable to send within retry time window",
     )
 
 proc evaluateAndCleanUp(self: SendService) =
   self.taskCache.forEach(self.reportTaskResult(it))
   self.taskCache.keepItIf(
-    it.state != DeliveryState.SuccessfullyValidated or
+    it.state != DeliveryState.SuccessfullyValidated and
       it.state != DeliveryState.FailedToDeliver
   )
 
@@ -238,8 +245,15 @@ proc stopSendService*(self: SendService) =
   if not self.serviceLoopHandle.isNil():
     discard self.serviceLoopHandle.cancelAndWait()
 
-proc send*(self: SendService, task: DeliveryTask): Future[void] {.async.} =
+proc send*(self: SendService, task: DeliveryTask) {.async.} =
   assert(not task.isNil(), "task for send must not be nil")
+
+  info "SendService.send: processing delivery task",
+    requestId = task.requestId, msgHash = task.msgHash
+
+  self.subscriptionService.subscribe(task.msg.contentTopic).isOkOr:
+    error "SendService.send: failed to subscribe to content topic",
+      contentTopic = task.msg.contentTopic, error = error
 
   await self.sendProcessor.process(task)
   reportTaskResult(self, task)

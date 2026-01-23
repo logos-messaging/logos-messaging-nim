@@ -425,15 +425,45 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
         return err("Health report not available")
       try:
         let healthReport = healthReportFut.read()
-        # Convert HealthStatus to NodeHealth
+
+        # Check if Relay or Lightpush Client is ready (MinimallyHealthy condition)
+        var relayReady = false
+        var lightpushClientReady = false
+        var storeClientReady = false
+        var filterClientReady = false
+
+        for protocolHealth in healthReport.protocolsHealth:
+          if protocolHealth.protocol == "Relay" and
+              protocolHealth.health == HealthStatus.READY:
+            relayReady = true
+          elif protocolHealth.protocol == "Lightpush Client" and
+              protocolHealth.health == HealthStatus.READY:
+            lightpushClientReady = true
+          elif protocolHealth.protocol == "Store Client" and
+              protocolHealth.health == HealthStatus.READY:
+            storeClientReady = true
+          elif protocolHealth.protocol == "Filter Client" and
+              protocolHealth.health == HealthStatus.READY:
+            filterClientReady = true
+
+        # Determine node health based on protocol states
+        let isMinimallyHealthy = relayReady or lightpushClientReady
         let nodeHealth =
-          case healthReport.nodeHealth
-          of HealthStatus.READY:
+          if isMinimallyHealthy and storeClientReady and filterClientReady:
             NodeHealth.Healthy
-          of HealthStatus.SYNCHRONIZING, HealthStatus.INITIALIZING:
+          elif isMinimallyHealthy:
             NodeHealth.MinimallyHealthy
           else:
             NodeHealth.Unhealthy
+
+        debug "Providing health report",
+          nodeHealth = $nodeHealth,
+          relayReady = relayReady,
+          lightpushClientReady = lightpushClientReady,
+          storeClientReady = storeClientReady,
+          filterClientReady = filterClientReady,
+          details = $(healthReport)
+
         ok(RequestNodeHealth(healthStatus: nodeHealth))
       except CatchableError:
         err("Failed to read health report: " & getCurrentExceptionMsg()),

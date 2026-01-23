@@ -86,6 +86,7 @@ type NodeConfig* {.requiresInit.} = object
   protocolsConfig: ProtocolsConfig
   networkingConfig: NetworkingConfig
   ethRpcEndpoints: seq[string]
+  p2pReliability: bool
 
 proc init*(
     T: typedesc[NodeConfig],
@@ -93,12 +94,14 @@ proc init*(
     protocolsConfig: ProtocolsConfig = TheWakuNetworkPreset,
     networkingConfig: NetworkingConfig = DefaultNetworkingConfig,
     ethRpcEndpoints: seq[string] = @[],
+    p2pReliability: bool = false,
 ): T =
   return T(
     mode: mode,
     protocolsConfig: protocolsConfig,
     networkingConfig: networkingConfig,
     ethRpcEndpoints: ethRpcEndpoints,
+    p2pReliability: p2pReliability,
   )
 
 proc toWakuConf*(nodeConfig: NodeConfig): Result[WakuConf, string] =
@@ -202,6 +205,7 @@ proc toWakuConf*(nodeConfig: NodeConfig): Result[WakuConf, string] =
 
   ## Various configurations
   b.withNatStrategy("any")
+  b.withP2PReliability(nodeConfig.p2pReliability)
 
   let wakuConf = b.build().valueOr:
     return err("Failed to build configuration: " & error)

@@ -4,6 +4,7 @@
 
 import std/[tables, sequtils, options]
 import chronos, chronicles, libp2p/utility
+import ../[subscription_service]
 import
   waku/[
     waku_core,
@@ -41,6 +42,7 @@ type RecvService* = ref object of RootObj
   node: WakuNode
   onSubscribeListener: OnFilterSubscribeEventListener
   onUnsubscribeListener: OnFilterUnsubscribeEventListener
+  subscriptionService: SubscriptionService
 
   recentReceivedMsgs: seq[RecvMessage]
 
@@ -90,7 +92,6 @@ proc msgChecker(self: RecvService) {.async.} =
   ## Continuously checks if a message has been received
   while true:
     await sleepAsync(StoreCheckPeriod)
-
     self.endTimeToCheck = getNowInNanosecondTime()
 
     var msgHashesInStore = newSeq[WakuMessageHash](0)
@@ -156,18 +157,24 @@ proc onUnsubscribe(
   do:
     error "onUnsubscribe unsubscribing from wrong topic", pubsubTopic, contentTopics
 
-proc new*(T: type RecvService, node: WakuNode): T =
+proc new*(T: typedesc[RecvService], node: WakuNode, s: SubscriptionService): T =
   ## The storeClient will help to acquire any possible missed messages
 
   let now = getNowInNanosecondTime()
-  var recvService =
-    RecvService(node: node, startTimeToCheck: now, brokerCtx: node.brokerCtx)
+  var recvService = RecvService(
+    node: node,
+    startTimeToCheck: now,
+    brokerCtx: node.brokerCtx,
+    subscriptionService: s,
+    topicsInterest: initTable[PubsubTopic, seq[ContentTopic]](),
+    recentReceivedMsgs: @[],
+  )
 
   if not node.wakuFilterClient.isNil():
     let filterPushHandler = proc(
         pubsubTopic: PubsubTopic, message: WakuMessage
     ) {.async, closure.} =
-      ## Captures all the messages recived through filter
+      ## Captures all the messages received through filter
 
       let msgHash = computeMessageHash(pubSubTopic, message)
       let rxMsg = RecvMessage(msgHash: msgHash, rxTime: message.timestamp)

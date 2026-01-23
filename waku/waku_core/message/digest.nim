@@ -19,7 +19,7 @@ func shortLog*(hash: WakuMessageHash): string =
 func `$`*(hash: WakuMessageHash): string =
   shortLog(hash)
 
-func toString*(hash: WakuMessageHash): string =
+func to0xHex*(hash: WakuMessageHash): string =
   var hexhash = newStringOfCap(64)
   hexhash &= hash.toOpenArray(hash.low, hash.high).to0xHex()
   hexhash

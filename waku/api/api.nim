@@ -55,7 +55,7 @@ proc send*(
 ): Future[Result[RequestId, string]] {.async.} =
   ?checkApiAvailability(w)
 
-  let requestId = newRequestId(w.rng)
+  let requestId = RequestId.new(w.rng)
 
   let deliveryTask = DeliveryTask.create(requestId, envelope, w.brokerCtx).valueOr:
     return err("API send: Failed to create delivery task: " & error)

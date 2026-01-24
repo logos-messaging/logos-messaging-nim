@@ -22,12 +22,15 @@ type
     MinimallyHealthy
     Unhealthy
 
-proc newRequestId*(rng: ref HmacDrbgContext): RequestId =
+proc new*(T: typedesc[RequestId], rng: ref HmacDrbgContext): T =
   ## Generate a new RequestId using the provided RNG.
   RequestId(request_utils.generateRequestId(rng))
 
 proc `$`*(r: RequestId): string {.inline.} =
   string(r)
+
+proc `==`*(a, b: RequestId): bool {.inline.} =
+  string(a) == string(b)
 
 proc init*(
     T: type MessageEnvelope,
@@ -48,7 +51,7 @@ proc toWakuMessage*(envelope: MessageEnvelope): WakuMessage =
     contentTopic: envelope.contentTopic,
     payload: envelope.payload,
     ephemeral: envelope.ephemeral,
-    timestamp: getNanosecondTime(getTime().toUnixFloat()),
+    timestamp: getNowInNanosecondTime(),
   )
 
   ## TODO: First find out if proof is needed at all

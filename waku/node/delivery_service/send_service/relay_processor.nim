@@ -60,7 +60,7 @@ method sendImpl*(self: RelaySendProcessor, task: DeliveryTask): Future[void] {.a
   let noOfPublishedPeers = (await self.publishProc(task.pubsubTopic, task.msg)).valueOr:
     let errorMessage = error.desc.get($error.code)
     error "Failed to publish message with relay",
-      request = task.requestId, msgHash = task.msgHash, error = errorMessage
+      request = task.requestId, msgHash = task.msgHash.to0xHex(), error = errorMessage
     if error.code != LightPushErrorCode.NO_PEERS_TO_RELAY:
       task.state = DeliveryState.FailedToDeliver
       task.errorDesc = errorMessage

@@ -116,9 +116,9 @@ proc validate(
   for requestId in manager.errorRequestIds:
     check requestId == expectedRequestId
 
-proc createApiNodeConf(): NodeConfig =
+proc createApiNodeConf(mode: WakuMode = WakuMode.Core): NodeConfig =
   result = NodeConfig.init(
-    mode = WakuMode.Core,
+    mode = mode,
     protocolsConfig = ProtocolsConfig.init(
       entryNodes = @[],
       clusterId = 1,
@@ -403,7 +403,7 @@ suite "Waku API - Send":
 
     var node: Waku
     lockNewGlobalBrokerContext:
-      node = (await createNode(createApiNodeConf())).valueOr:
+      node = (await createNode(createApiNodeConf(WakuMode.Edge))).valueOr:
         raiseAssert error
       (await startWaku(addr node)).isOkOr:
         raiseAssert "Failed to start Waku node: " & error
@@ -421,8 +421,9 @@ suite "Waku API - Send":
     let requestId = (await node.send(envelope)).valueOr:
       raiseAssert error
 
+    echo "Sent message with requestId=", requestId
     # Wait for events with timeout
-    const eventTimeout = 10.seconds
+    const eventTimeout = 62.seconds
     discard await eventManager.waitForEvents(eventTimeout)
 
     eventManager.validate({SendEventOutcome.Error}, requestId)

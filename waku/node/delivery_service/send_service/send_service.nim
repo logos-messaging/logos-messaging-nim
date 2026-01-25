@@ -173,9 +173,13 @@ proc reportTaskResult(self: SendService, task: DeliveryTask) =
   case task.state
   of DeliveryState.SuccessfullyPropagated:
     # TODO: in case of of unable to strore check messages shall we report success instead?
-    info "Message successfully propagated",
-      requestId = task.requestId, msgHash = task.msgHash.to0xHex()
-    MessagePropagatedEvent.emit(self.brokerCtx, task.requestId, task.msgHash.to0xHex())
+    if not task.propagateEventEmitted:
+      info "Message successfully propagated",
+        requestId = task.requestId, msgHash = task.msgHash.to0xHex()
+      MessagePropagatedEvent.emit(
+        self.brokerCtx, task.requestId, task.msgHash.to0xHex()
+      )
+      task.propagateEventEmitted = true
     return
   of DeliveryState.SuccessfullyValidated:
     info "Message successfully sent",
@@ -249,7 +253,7 @@ proc send*(self: SendService, task: DeliveryTask) {.async.} =
   assert(not task.isNil(), "task for send must not be nil")
 
   info "SendService.send: processing delivery task",
-    requestId = task.requestId, msgHash = task.msgHash
+    requestId = task.requestId, msgHash = task.msgHash.to0xHex()
 
   self.subscriptionService.subscribe(task.msg.contentTopic).isOkOr:
     error "SendService.send: failed to subscribe to content topic",

@@ -18,6 +18,7 @@ type DeliveryTask* = ref object
   tryCount*: int
   state*: DeliveryState
   deliveryTime*: Moment
+  propagateEventEmitted*: bool
   errorDesc*: string
 
 proc create*(

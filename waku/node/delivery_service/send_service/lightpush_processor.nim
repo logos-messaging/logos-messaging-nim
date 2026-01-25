@@ -66,8 +66,8 @@ method sendImpl*(
     return
 
   if pushResult.isOk and pushResult.get() > 0:
-    info "Message propagated via Relay",
-      requestId = task.requestId, msgHash = task.msgHash
+    info "Message propagated via Lightpush",
+      requestId = task.requestId, msgHash = task.msgHash.to0xHex()
     task.state = DeliveryState.SuccessfullyPropagated
     task.deliveryTime = Moment.now()
     # TODO: with a simple retry processor it might be more accurate to say `Sent`

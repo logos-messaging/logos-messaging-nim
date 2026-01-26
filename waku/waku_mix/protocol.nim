@@ -165,10 +165,25 @@ proc processBootNodes(
       error "Failed to parse multiaddress", multiAddr = node.multiAddr, error = error
       continue
 
-    mixNodes[peerId] = MixPubInfo.init(peerId, multiAddr, node.pubKey, peerPubKey.skkey)
+    # Strip /p2p/ suffix for mix protocol - it only needs network address
+    var networkAddr = multiAddr
+    try:
+      if multiAddr.contains(multiCodec("p2p")).get():
+        let parts = multiAddr.items().toSeq()
+        var addrWithoutP2P = MultiAddress()
+        for i in 0 ..< parts.len - 1:
+          let part = parts[i].valueOr:
+            continue
+          addrWithoutP2P = addrWithoutP2P & part
+        networkAddr = addrWithoutP2P
+    except CatchableError as e:
+      warn "Failed to strip /p2p/ from multiaddr", error = e.msg
+      # Continue with full multiaddr
+
+    mixNodes[peerId] = MixPubInfo.init(peerId, networkAddr, node.pubKey, peerPubKey.skkey)
 
     peermgr.addPeer(
-      RemotePeerInfo.init(peerId, @[multiAddr], mixPubKey = some(node.pubKey))
+      RemotePeerInfo.init(peerId, @[networkAddr], mixPubKey = some(node.pubKey))
     )
   mix_pool_size.set(len(mixNodes))
   info "using mix bootstrap nodes ", bootNodes = mixNodes
@@ -198,8 +213,15 @@ proc new*(
   if len(initTable) < minMixPoolSize:
     warn "publishing with mix won't work until atleast  3 mix nodes in node pool"
 
-  # Initialize spam protection with default config (ephemeral credentials)
-  let spamProtectionConfig = defaultConfig()
+  # Initialize spam protection with persistent credentials
+  # Use peerID in keystore path so multiple peers can run from same directory
+  # Tree path is shared across all nodes to maintain the full membership set
+  let peerId = peermgr.switch.peerInfo.peerId
+  var spamProtectionConfig = defaultConfig()
+  spamProtectionConfig.keystorePath = "rln_keystore_" & $peerId & ".json"
+  spamProtectionConfig.keystorePassword = "mix-rln-password"
+  # rlnResourcesPath left empty to use bundled resources (via "tree_height_/" placeholder)
+
   let spamProtection = newMixRlnSpamProtection(spamProtectionConfig).valueOr:
     return err("failed to create spam protection: " & error)
 
@@ -266,6 +288,14 @@ proc handleMessage*(
       warn "Failed to handle membership update", error = res.error
     else:
       trace "Handled membership update"
+
+      # Persist tree after membership changes (temporary solution)
+      # TODO: Replace with proper persistence strategy (e.g., periodic snapshots)
+      let saveRes = mix.mixRlnSpamProtection.saveTree()
+      if saveRes.isErr:
+        debug "Failed to save tree after membership update", error = saveRes.error
+      else:
+        trace "Saved tree after membership update"
   elif contentTopic == mix.mixRlnSpamProtection.getProofMetadataContentTopic():
     # Handle proof metadata for network-wide spam detection
     let res = mix.mixRlnSpamProtection.handleProofMetadata(message.payload)
@@ -281,30 +311,79 @@ proc getSpamProtectionContentTopics*(mix: WakuMix): seq[string] =
     return @[]
   return mix.mixRlnSpamProtection.getContentTopics()
 
+proc saveSpamProtectionTree*(mix: WakuMix): Result[void, string] =
+  ## Save the spam protection membership tree to disk.
+  ## This allows preserving the tree state across restarts.
+  if mix.mixRlnSpamProtection.isNil():
+    return err("Spam protection not initialized")
+
+  mix.mixRlnSpamProtection.saveTree().mapErr(
+    proc(e: string): string =
+      e
+  )
+
+proc loadSpamProtectionTree*(mix: WakuMix): Result[void, string] =
+  ## Load the spam protection membership tree from disk.
+  ## Call this before init() to restore tree state from previous runs.
+  ## TODO: This is a temporary solution. Ideally nodes should sync tree state
+  ## via a store query for historical membership messages or via dedicated
+  ## tree sync protocol.
+  if mix.mixRlnSpamProtection.isNil():
+    return err("Spam protection not initialized")
+
+  mix.mixRlnSpamProtection.loadTree().mapErr(
+    proc(e: string): string =
+      e
+  )
+
 method start*(mix: WakuMix) {.async.} =
   info "starting waku mix protocol"
 
-  # Initialize and start spam protection
+  # Set up spam protection callbacks and start
   if not mix.mixRlnSpamProtection.isNil():
+    # Initialize spam protection (MixProtocol.init() does NOT call init() on the plugin)
     let initRes = await mix.mixRlnSpamProtection.init()
     if initRes.isErr:
       error "Failed to initialize spam protection", error = initRes.error
     else:
-      # Set up publish callback after init
+      # Load existing tree to sync with other members
+      # This should be done after init() (which loads credentials)
+      # but before registerSelf() (which adds us to the tree)
+      let loadRes = mix.mixRlnSpamProtection.loadTree()
+      if loadRes.isErr:
+        debug "No existing tree found or failed to load, starting fresh",
+          error = loadRes.error
+      else:
+        info "Loaded existing spam protection membership tree from disk"
+      
+      # Restore our credentials to the tree (after tree load, whether it succeeded or not)
+      # This ensures our member is in the tree if we have an index from keystore
+      let restoreRes = mix.mixRlnSpamProtection.restoreCredentialsToTree()
+      if restoreRes.isErr:
+        error "Failed to restore credentials to tree", error = restoreRes.error
+
+      # Set up publish callback (must be before start so registerSelf can use it)
       mix.setupSpamProtectionCallbacks()
 
       let startRes = await mix.mixRlnSpamProtection.start()
       if startRes.isErr:
         error "Failed to start spam protection", error = startRes.error
       else:
-        # Register self in the membership tree
-        let regRes = await mix.mixRlnSpamProtection.registerSelf()
-        if regRes.isErr:
-          warn "Failed to register self in spam protection membership",
-            error = regRes.error
+        # Register self to broadcast membership to the network
+        let registerRes = await mix.mixRlnSpamProtection.registerSelf()
+        if registerRes.isErr:
+          error "Failed to register spam protection credentials",
+            error = registerRes.error
         else:
-          info "Spam protection started and self registered",
-            membershipIndex = regRes.get()
+          info "Successfully registered spam protection credentials and broadcasted to network",
+            index = registerRes.get()
+
+        # Save tree to persist membership state
+        let saveRes = mix.mixRlnSpamProtection.saveTree()
+        if saveRes.isErr:
+          warn "Failed to save spam protection tree", error = saveRes.error
+        else:
+          info "Saved spam protection tree to disk"
 
   mix.nodePoolLoopHandle = mix.startMixNodePoolMgr()
 

@@ -16,6 +16,25 @@ make wakunode2
 make chat2mix
 ```
 
+## RLN Spam Protection Setup
+
+Before running the simulation, you need to generate RLN credentials and the shared Merkle tree for all nodes. This is required for the spam protection mechanism.
+
+```bash
+cd simulations/mixnet
+./build_setup.sh
+```
+
+This script will:
+1. Build and run the `setup_credentials` tool
+2. Generate RLN credentials for all 7 nodes (5 mix nodes + 2 chat clients)
+3. Create `rln_tree.db` - the shared Merkle tree with all members
+4. Create keystore files (`rln_keystore_{peerId}.json`) for each node
+
+**Important:** All node scripts must be run from this directory (`simulations/mixnet/`) so they can access their credentials and tree file.
+
+If you need to regenerate credentials (e.g., after adding new nodes), simply run `./build_setup.sh` again - it will clean up old files first.
+
 Simulation includes scripts for:
 
 1. a 4 waku-node mixnet where `node1` is bootstrap node for the other 3 nodes.

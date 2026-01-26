@@ -317,11 +317,9 @@ proc mountMix*(
   catchRes.isOkOr:
     return err(error.msg)
 
-  await node.wakuMix.start()
+  # Note: start() is called later in WakuNode.start(), not here during mount
 
   return ok()
-
-## Waku Sync
 
 proc mountStoreSync*(
     node: WakuNode,

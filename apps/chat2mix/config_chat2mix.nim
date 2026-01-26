@@ -243,19 +243,8 @@ proc parseCmdArg*(T: type MixNodePubInfo, p: string): T =
       ValueError, "Invalid format for ip address, expected a ipv4 multiaddress"
     )
 
-  # Strip /p2p/ suffix if present - mix protocol expects base address only
-  var cleanAddr = multiaddr
-  if multiaddr.contains(multiCodec("p2p")).get():
-    let parts = multiaddr.items().toSeq()
-    # Rebuild without the /p2p/ component (last component)
-    var addrWithoutP2P = MultiAddress()
-    for i in 0 ..< parts.len - 1:
-      addrWithoutP2P = addrWithoutP2P & parts[i].tryGet()
-    cleanAddr = addrWithoutP2P
-
   return MixNodePubInfo(
-    multiaddr: cleanAddr.toString().valueOr(elements[0]),
-    pubKey: intoCurve25519Key(ncrutils.fromHex(elements[1])),
+    multiaddr: elements[0], pubKey: intoCurve25519Key(ncrutils.fromHex(elements[1]))
   )
 
 # NOTE: Keys are different in nim-libp2p

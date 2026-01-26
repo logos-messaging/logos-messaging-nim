@@ -180,13 +180,14 @@ proc processBootNodes(
       warn "Failed to strip /p2p/ from multiaddr", error = e.msg
       # Continue with full multiaddr
 
-    mixNodes[peerId] = MixPubInfo.init(peerId, networkAddr, node.pubKey, peerPubKey.skkey)
+    mixNodes[peerId] =
+      MixPubInfo.init(peerId, networkAddr, node.pubKey, peerPubKey.skkey)
 
     peermgr.addPeer(
       RemotePeerInfo.init(peerId, @[networkAddr], mixPubKey = some(node.pubKey))
     )
   mix_pool_size.set(len(mixNodes))
-  info "using mix bootstrap nodes ", bootNodes = mixNodes
+  debug "using mix bootstrap nodes", count = mixNodes.len
   return mixNodes
 
 proc new*(
@@ -199,7 +200,7 @@ proc new*(
     publishMessage: PublishMessage,
 ): WakuMixResult[T] =
   let mixPubKey = public(mixPrivKey)
-  info "mixPubKey", mixPubKey = mixPubKey
+  trace "mixPubKey", mixPubKey = mixPubKey
   let nodeMultiAddr = MultiAddress.init(nodeAddr).valueOr:
     return err("failed to parse mix node address: " & $nodeAddr & ", error: " & error)
   let localMixNodeInfo = initMixNodeInfo(
@@ -269,7 +270,7 @@ proc setupSpamProtectionCallbacks(mix: WakuMix) =
     trace "Published spam protection coordination message", contentTopic = contentTopic
 
   mix.mixRlnSpamProtection.setPublishCallback(publishCallback)
-  info "Spam protection publish callback configured"
+  trace "Spam protection publish callback configured"
 
 proc handleMessage*(
     mix: WakuMix, pubsubTopic: PubsubTopic, message: WakuMessage
@@ -354,8 +355,8 @@ method start*(mix: WakuMix) {.async.} =
         debug "No existing tree found or failed to load, starting fresh",
           error = loadRes.error
       else:
-        info "Loaded existing spam protection membership tree from disk"
-      
+        debug "Loaded existing spam protection membership tree from disk"
+
       # Restore our credentials to the tree (after tree load, whether it succeeded or not)
       # This ensures our member is in the tree if we have an index from keystore
       let restoreRes = mix.mixRlnSpamProtection.restoreCredentialsToTree()
@@ -375,15 +376,14 @@ method start*(mix: WakuMix) {.async.} =
           error "Failed to register spam protection credentials",
             error = registerRes.error
         else:
-          info "Successfully registered spam protection credentials and broadcasted to network",
-            index = registerRes.get()
+          debug "Registered spam protection credentials", index = registerRes.get()
 
         # Save tree to persist membership state
         let saveRes = mix.mixRlnSpamProtection.saveTree()
         if saveRes.isErr:
           warn "Failed to save spam protection tree", error = saveRes.error
         else:
-          info "Saved spam protection tree to disk"
+          trace "Saved spam protection tree to disk"
 
   mix.nodePoolLoopHandle = mix.startMixNodePoolMgr()
 
@@ -391,7 +391,7 @@ method stop*(mix: WakuMix) {.async.} =
   # Stop spam protection
   if not mix.mixRlnSpamProtection.isNil():
     await mix.mixRlnSpamProtection.stop()
-    info "Spam protection stopped"
+    debug "Spam protection stopped"
 
   if mix.nodePoolLoopHandle.isNil():
     return

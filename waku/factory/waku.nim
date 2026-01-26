@@ -186,6 +186,9 @@ proc new*(
     error "Failed setting up node", error = $error
     return err("Failed setting up node: " & $error)
 
+  # Set the extMultiAddrsOnly flag so the node knows not to replace explicit addresses
+  node.extMultiAddrsOnly = wakuConf.endpointConf.extMultiAddrsOnly
+
   healthMonitor.setNodeToHealthMonitor(node)
   healthMonitor.onlineMonitor.setPeerStoreToOnlineMonitor(node.switch.peerStore)
   healthMonitor.onlineMonitor.addOnlineStateObserver(

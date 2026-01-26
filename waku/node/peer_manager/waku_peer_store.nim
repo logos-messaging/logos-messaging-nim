@@ -85,7 +85,7 @@ proc delete*(peerStore: PeerStore, peerId: PeerId) =
 
 proc peers*(peerStore: PeerStore): seq[RemotePeerInfo] =
   let allKeys = concat(
-      toSeq(peerStore[LastSeenBook].book.keys()),
+      toSeq(peerStore[LastSeenOutboundBook].book.keys()),
       toSeq(peerStore[AddressBook].book.keys()),
       toSeq(peerStore[ProtoBook].book.keys()),
       toSeq(peerStore[KeyBook].book.keys()),

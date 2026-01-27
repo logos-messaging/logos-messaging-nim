@@ -228,7 +228,14 @@ type
       desc: "WebSocket Secure Support.",
       defaultValue: false,
       name: "websocket-secure-support"
-    .}: bool ## rln-relay configuration
+    .}: bool
+
+    ## RLN spam protection config
+    rlnUserMessageLimit* {.
+      desc: "Maximum messages per epoch for RLN spam protection.",
+      defaultValue: 3,
+      name: "rln-user-message-limit"
+    .}: int
 
 proc parseCmdArg*(T: type MixNodePubInfo, p: string): T =
   let elements = p.split(":")

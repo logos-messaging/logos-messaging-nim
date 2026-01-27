@@ -45,7 +45,7 @@ proc sendPushRequestToConn(
 ): Future[WakuLightPushResult] {.async.} =
   try:
     await conn.writeLp(request.encode().buffer)
-  except LPStreamRemoteClosedError:
+  except LPStreamError:
     error "Failed to write request to peer", error = getCurrentExceptionMsg()
     return lightpushResultInternalError(
       "Failed to write request to peer: " & getCurrentExceptionMsg()

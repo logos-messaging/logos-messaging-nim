@@ -310,20 +310,21 @@ proc publish(c: Chat, line: string) {.async.} =
   try:
     if not c.node.wakuLightpushClient.isNil():
       # Attempt lightpush with mix
-
-      (
-        waitFor c.node.lightpushPublish(
-          some(c.conf.getPubsubTopic(c.node, c.contentTopic)),
-          message,
-          none(RemotePeerInfo),
-          true,
-        )
-      ).isOkOr:
-        error "failed to publish lightpush message", error = error
+      let res = await c.node.lightpushPublish(
+        some(c.conf.getPubsubTopic(c.node, c.contentTopic)),
+        message,
+        none(RemotePeerInfo),
+        true,
+      )
+      if res.isErr():
+        error "failed to publish lightpush message", error = res.error
+        echo "Error: " & res.error.desc.get("unknown error")
     else:
       error "failed to publish message as lightpush client is not initialized"
+      echo "Error: lightpush client is not initialized"
   except CatchableError:
     error "caught error publishing message: ", error = getCurrentExceptionMsg()
+    echo "Error: " & getCurrentExceptionMsg()
 
 # TODO This should read or be subscribe handler subscribe
 proc readAndPrint(c: Chat) {.async.} =
@@ -552,7 +553,11 @@ proc processInput(rfd: AsyncFD, rng: ref HmacDrbgContext) {.async.} =
     error "failed to generate mix key pair", error = error
     return
 
-  (await node.mountMix(conf.clusterId, mixPrivKey, conf.mixnodes)).isOkOr:
+  (
+    await node.mountMix(
+      conf.clusterId, mixPrivKey, conf.mixnodes, some(conf.rlnUserMessageLimit)
+    )
+  ).isOkOr:
     error "failed to mount waku mix protocol: ", error = $error
     quit(QuitFailure)
 

@@ -198,6 +198,7 @@ proc new*(
     mixPrivKey: Curve25519Key,
     bootnodes: seq[MixNodePubInfo],
     publishMessage: PublishMessage,
+    userMessageLimit: Option[int] = none(int),
 ): WakuMixResult[T] =
   let mixPubKey = public(mixPrivKey)
   trace "mixPubKey", mixPubKey = mixPubKey
@@ -221,6 +222,8 @@ proc new*(
   var spamProtectionConfig = defaultConfig()
   spamProtectionConfig.keystorePath = "rln_keystore_" & $peerId & ".json"
   spamProtectionConfig.keystorePassword = "mix-rln-password"
+  if userMessageLimit.isSome():
+    spamProtectionConfig.userMessageLimit = userMessageLimit.get()
   # rlnResourcesPath left empty to use bundled resources (via "tree_height_/" placeholder)
 
   let spamProtection = newMixRlnSpamProtection(spamProtectionConfig).valueOr:

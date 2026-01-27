@@ -275,6 +275,7 @@ proc mountMix*(
     clusterId: uint16,
     mixPrivKey: Curve25519Key,
     mixnodes: seq[MixNodePubInfo],
+    userMessageLimit: Option[int] = none(int),
 ): Future[Result[void, string]] {.async.} =
   info "mounting mix protocol", nodeId = node.info #TODO log the config used
 
@@ -306,7 +307,8 @@ proc mountMix*(
     return ok()
 
   node.wakuMix = WakuMix.new(
-    localaddrStr, node.peerManager, clusterId, mixPrivKey, mixnodes, publishMessage
+    localaddrStr, node.peerManager, clusterId, mixPrivKey, mixnodes, publishMessage,
+    userMessageLimit,
   ).valueOr:
     error "Waku Mix protocol initialization failed", err = error
     return

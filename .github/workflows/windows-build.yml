@@ -17,6 +17,7 @@ jobs:
 
     env:
       MSYSTEM: MINGW64
+      SSL_CERT_FILE: /mingw64/etc/ssl/certs/ca-bundle.crt
 
     steps:
     - name: Checkout code

@@ -16,6 +16,7 @@ import
   ../peer_manager,
   ./online_monitor,
   ./health_status,
+  ./health_report,
   ./connection_status,
   ./protocol_health,
   ../../api/types,
@@ -31,26 +32,18 @@ const
   DefaultRelayFailoverThreshold* = 4
   FailoverThreshold* = 2
 
-type
-  HealthReport* = object
-    ## Rest API type returned for /health endpoint
-    ##
-    nodeHealth*: HealthStatus # legacy "READY" health indicator
-    connectionStatus*: ConnectionStatus # new "Connected" health indicator
-    protocolsHealth*: seq[ProtocolHealth]
-
-  NodeHealthMonitor* = ref object
-    nodeHealth: HealthStatus
-    node: WakuNode
-    onlineMonitor*: OnlineMonitor
-    keepAliveFut: Future[void]
-    healthLoopFut: Future[void]
-    healthUpdateEvent: AsyncEvent
-    connectionStatus: ConnectionStatus
-    onConnectionStatusChange*: ConnectionStatusChangeHandler
-    cachedProtocols: seq[ProtocolHealth]
-    strength: Table[WakuProtocol, int]
-    relayObserver: PubSubObserver
+type NodeHealthMonitor* = ref object
+  nodeHealth: HealthStatus
+  node: WakuNode
+  onlineMonitor*: OnlineMonitor
+  keepAliveFut: Future[void]
+  healthLoopFut: Future[void]
+  healthUpdateEvent: AsyncEvent
+  connectionStatus: ConnectionStatus
+  onConnectionStatusChange*: ConnectionStatusChangeHandler
+  cachedProtocols: seq[ProtocolHealth]
+  strength: Table[WakuProtocol, int] ## latest connectivity strength (e.g. peer count) for a protocol
+  relayObserver: PubSubObserver
 
 func getHealth*(report: HealthReport, kind: WakuProtocol): ProtocolHealth =
   for h in report.protocolsHealth:
@@ -319,6 +312,95 @@ proc getMixHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
   return p.ready()
 
+proc getSyncProtocolHealthInfo*(
+    hm: NodeHealthMonitor, protocol: WakuProtocol
+): ProtocolHealth =
+  ## Get ProtocolHealth for a given protocol that can provide it synchronously
+  ##
+  case protocol
+  of WakuProtocol.RelayProtocol:
+    return hm.getRelayHealth()
+  of WakuProtocol.StoreProtocol:
+    return hm.getStoreHealth()
+  of WakuProtocol.LegacyStoreProtocol:
+    return hm.getLegacyStoreHealth()
+  of WakuProtocol.FilterProtocol:
+    return hm.getFilterHealth(hm.getRelayHealth().health)
+  of WakuProtocol.LightpushProtocol:
+    return hm.getLightpushHealth(hm.getRelayHealth().health)
+  of WakuProtocol.LegacyLightpushProtocol:
+    return hm.getLegacyLightpushHealth(hm.getRelayHealth().health)
+  of WakuProtocol.PeerExchangeProtocol:
+    return hm.getPeerExchangeHealth()
+  of WakuProtocol.RendezvousProtocol:
+    return hm.getRendezvousHealth()
+  of WakuProtocol.MixProtocol:
+    return hm.getMixHealth()
+  of WakuProtocol.StoreClientProtocol:
+    return hm.getStoreClientHealth()
+  of WakuProtocol.LegacyStoreClientProtocol:
+    return hm.getLegacyStoreClientHealth()
+  of WakuProtocol.FilterClientProtocol:
+    return hm.getFilterClientHealth()
+  of WakuProtocol.LightpushClientProtocol:
+    return hm.getLightpushClientHealth()
+  of WakuProtocol.LegacyLightpushClientProtocol:
+    return hm.getLegacyLightpushClientHealth()
+  of WakuProtocol.RlnRelayProtocol:
+    # Could waitFor here but we don't want to block the main thread.
+    # Could also return a cached value from a previous check.
+    var p = ProtocolHealth.init(protocol)
+    return p.notReady("RLN Relay health check is async")
+  else:
+    var p = ProtocolHealth.init(protocol)
+    return p.notMounted()
+
+proc getProtocolHealthInfo*(
+    hm: NodeHealthMonitor, protocol: WakuProtocol
+): Future[ProtocolHealth] {.async.} =
+  ## Get ProtocolHealth for a given protocol
+  ##
+  case protocol
+  of WakuProtocol.RlnRelayProtocol:
+    return await hm.getRlnRelayHealth()
+  else:
+    return hm.getSyncProtocolHealthInfo(protocol)
+
+proc getSyncAllProtocolHealthInfo(hm: NodeHealthMonitor): seq[ProtocolHealth] =
+  ## Get ProtocolHealth for the subset of protocols that can provide it synchronously
+  ##
+  var protocols: seq[ProtocolHealth] = @[]
+  let relayHealth = hm.getRelayHealth()
+  protocols.add(relayHealth)
+
+  protocols.add(hm.getLightpushHealth(relayHealth.health))
+  protocols.add(hm.getLegacyLightpushHealth(relayHealth.health))
+  protocols.add(hm.getFilterHealth(relayHealth.health))
+  protocols.add(hm.getStoreHealth())
+  protocols.add(hm.getLegacyStoreHealth())
+  protocols.add(hm.getPeerExchangeHealth())
+  protocols.add(hm.getRendezvousHealth())
+  protocols.add(hm.getMixHealth())
+
+  protocols.add(hm.getLightpushClientHealth())
+  protocols.add(hm.getLegacyLightpushClientHealth())
+  protocols.add(hm.getStoreClientHealth())
+  protocols.add(hm.getLegacyStoreClientHealth())
+  protocols.add(hm.getFilterClientHealth())
+  return protocols
+
+proc getAllProtocolHealthInfo(
+    hm: NodeHealthMonitor
+): Future[seq[ProtocolHealth]] {.async.} =
+  ## Get ProtocolHealth for all protocols
+  ##
+  var protocols = hm.getSyncAllProtocolHealthInfo()
+
+  let rlnHealth = await hm.getRlnRelayHealth()
+  protocols.add(rlnHealth)
+
+  return protocols
+
 proc calculateConnectionState*(
     protocols: seq[ProtocolHealth],
     strength: Table[WakuProtocol, int],
@@ -389,40 +471,9 @@ proc calculateConnectionState*(hm: NodeHealthMonitor): ConnectionStatus =
     hm.cachedProtocols, hm.strength, hm.getRelayFailoverThreshold()
   )
 
-proc getSyncProtocolHealthInfo(
-    hm: NodeHealthMonitor
-): seq[ProtocolHealth] =
-  var protocols: seq[ProtocolHealth] = @[]
-  let relayHealth = hm.getRelayHealth()
-  protocols.add(relayHealth)
-
-  protocols.add(hm.getLightpushHealth(relayHealth.health))
-  protocols.add(hm.getLegacyLightpushHealth(relayHealth.health))
-  protocols.add(hm.getFilterHealth(relayHealth.health))
-  protocols.add(hm.getStoreHealth())
-  protocols.add(hm.getLegacyStoreHealth())
-  protocols.add(hm.getPeerExchangeHealth())
-  protocols.add(hm.getRendezvousHealth())
-  protocols.add(hm.getMixHealth())
-
-  protocols.add(hm.getLightpushClientHealth())
-  protocols.add(hm.getLegacyLightpushClientHealth())
-  protocols.add(hm.getStoreClientHealth())
-  protocols.add(hm.getLegacyStoreClientHealth())
-  protocols.add(hm.getFilterClientHealth())
-  return protocols
-
-proc getAllProtocolHealthInfo(
-    hm: NodeHealthMonitor
-): Future[seq[ProtocolHealth]] {.async.} =
-  var protocols = hm.getSyncProtocolHealthInfo()
-
-  let rlnHealth = await hm.getRlnRelayHealth()
-  protocols.add(rlnHealth)
-
-  return protocols
-
 proc getNodeHealthReport*(hm: NodeHealthMonitor): Future[HealthReport] {.async.} =
+  ## Get a HealthReport that includes all protocols
+  ##
   var report: HealthReport
 
   if isNil(hm.node):
@@ -446,6 +497,8 @@ proc getNodeHealthReport*(hm: NodeHealthMonitor): Future[HealthReport] {.async.}
   return report
 
 proc getSyncNodeHealthReport*(hm: NodeHealthMonitor): HealthReport =
+  ## Get a HealthReport that includes the subset of protocols that inform health synchronously
+  ##
   var report: HealthReport
 
   if isNil(hm.node):
@@ -460,7 +513,7 @@ proc getSyncNodeHealthReport*(hm: NodeHealthMonitor): HealthReport =
     return report
 
   if hm.cachedProtocols.len == 0:
-    hm.cachedProtocols = hm.getSyncProtocolHealthInfo()
+    hm.cachedProtocols = hm.getSyncAllProtocolHealthInfo()
     hm.connectionStatus = hm.calculateConnectionState()
 
   report.nodeHealth = HealthStatus.READY
@@ -468,9 +521,7 @@ proc getSyncNodeHealthReport*(hm: NodeHealthMonitor): HealthReport =
   report.protocolsHealth = hm.cachedProtocols
   return report
 
-proc onPeerEvent(
-    hm: NodeHealthMonitor, peerId: PeerId, event: PeerEvent
-) {.async.} =
+proc onPeerEvent(hm: NodeHealthMonitor, peerId: PeerId, event: PeerEvent) {.async.} =
   case event.kind
   of PeerEventKind.Joined, PeerEventKind.Left, PeerEventKind.Identified:
     # recomputing node health when peer connection events of interest trigger

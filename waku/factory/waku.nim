@@ -419,17 +419,30 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
     return err("failed to start health monitor: " & $error)
 
   ## Setup RequestConnectionStatus provider
-
   RequestConnectionStatus.setProvider(
     globalBrokerContext(),
     proc(): Result[RequestConnectionStatus, string] =
-      let healthReport = waku[].healthMonitor.getSyncNodeHealthReport()
       try:
+        let healthReport = waku[].healthMonitor.getSyncNodeHealthReport()
         ok(RequestConnectionStatus(connectionStatus: healthReport.connectionStatus))
       except CatchableError:
-        err("Failed to read health report: " & getCurrentExceptionMsg()),
+        err("Failed to read health report: " & getCurrentExceptionMsg())
   ).isOkOr:
     error "Failed to set RequestConnectionStatus provider", error = error
+
+  ## Setup RequestProtocolHealth provider
+  RequestProtocolHealth.setProvider(
+    globalBrokerContext(),
+    proc(
+        protocol: WakuProtocol
+    ): Future[Result[RequestProtocolHealth, string]] {.async.} =
+      try:
+        let protocolHealthStatus = await waku[].healthMonitor.getProtocolHealthInfo(protocol)
+        ok(RequestProtocolHealth(healthStatus: protocolHealthStatus))
+      except CatchableError:
+        err("Failed to get protocol health: " & getCurrentExceptionMsg())
+  ).isOkOr:
+    error "Failed to set RequestProtocolHealth provider", error = error
 
   if conf.restServerConf.isSome():
     rest_server_builder.startRestServerProtocolSupport(

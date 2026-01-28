@@ -17,7 +17,6 @@ jobs:
 
     env:
       MSYSTEM: MINGW64
-      SSL_CERT_FILE: /mingw64/etc/ssl/certs/ca-bundle.crt
 
     steps:
     - name: Checkout code
@@ -68,6 +67,8 @@ jobs:
 
     - name: Make update
       run: make update
+      env:
+        SSL_CERT_FILE: ${{ runner.temp }}\msys64\mingw64\etc\ssl\certs\ca-bundle.crt
 
     - name: Building wakunode2.exe
       run: |

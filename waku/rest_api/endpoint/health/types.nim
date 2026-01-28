@@ -3,6 +3,7 @@
 import results
 import chronicles, json_serialization, json_serialization/std/options
 import ../../../waku_node, ../serdes
+import ../../../api/types
 
 #### Serialization and deserialization
 
@@ -44,6 +45,7 @@ proc writeValue*(
 ) {.raises: [IOError].} =
   writer.beginRecord()
   writer.writeField("nodeHealth", $value.nodeHealth)
+  writer.writeField("connectionStatus", $value.connectionStatus)
   writer.writeField("protocolsHealth", value.protocolsHealth)
   writer.endRecord()
 
@@ -52,6 +54,7 @@ proc readValue*(
 ) {.raises: [SerializationError, IOError].} =
   var
     nodeHealth: Option[HealthStatus]
+    connectionStatus: Option[ConnectionStatus]
     protocolsHealth: Option[seq[ProtocolHealth]]
 
   for fieldName in readObjectFields(reader):
@@ -66,6 +69,14 @@ proc readValue*(
         reader.raiseUnexpectedValue("Invalid `health` value: " & $error)
 
       nodeHealth = some(health)
+    of "connectionStatus":
+      if connectionStatus.isSome():
+        reader.raiseUnexpectedField("Multiple `connectionStatus` fields found", "HealthReport")
+
+      let state = ConnectionStatus.init(reader.readValue(string)).valueOr:
+        reader.raiseUnexpectedValue("Invalid `connectionStatus` value: " & $error)
+
+      connectionStatus = some(state)
     of "protocolsHealth":
       if protocolsHealth.isSome():
         reader.raiseUnexpectedField(
@@ -79,5 +90,8 @@ proc readValue*(
   if nodeHealth.isNone():
     reader.raiseUnexpectedValue("Field `nodeHealth` is missing")
 
-  value =
-    HealthReport(nodeHealth: nodeHealth.get, protocolsHealth: protocolsHealth.get(@[]))
+  value = HealthReport(
+    nodeHealth: nodeHealth.get,
+    connectionStatus: connectionStatus.get,
+    protocolsHealth: protocolsHealth.get(@[]),
+  )

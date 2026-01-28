@@ -65,6 +65,13 @@ jobs:
       run: |
         which upx gcc g++ make cmake cargo rustc python nim nimble
 
+    - name: Debug SSL Path
+      run: |
+        echo "Runner Temp: ${{ runner.temp }}"
+        ls -R ${{ runner.temp }}/msys64/mingw64/ssl || true
+        find ${{ runner.temp }}/msys64 -name "ca-bundle.crt" || true
+
+
     - name: Make update
       run: make update
       env:

@@ -44,8 +44,17 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-llvm
           mingw-w64-x86_64-clang
-      
-    - name: Add UPX to PATH
+          mingw-w64-x86_64-nim
+          mingw-w64-x86_64-nimble
+
+    - name: Install Nim
+      uses: iffy/install-nim@v5
+      with:
+        version: binary:2.2.4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Add paths
       run: |
         echo "/usr/bin:$PATH" >> $GITHUB_PATH
         echo "/mingw64/bin:$PATH" >> $GITHUB_PATH
@@ -54,31 +63,19 @@ jobs:
 
     - name: Verify dependencies
       run: |
-        which upx gcc g++ make cmake cargo rustc python
+        which upx gcc g++ make cmake cargo rustc python nim nimble
 
-    - name: Updating submodules
-      run: git submodule update --init --recursive
-
-    - name: Creating tmp directory
-      run: mkdir -p tmp
-
-    - name: Building Nim
+    - name: Debug SSL Path
       run: |
-        cd vendor/nimbus-build-system/vendor/Nim
-        ./build_all.bat
-        cd ../../../..
+        echo "Runner Temp: ${{ runner.temp }}"
+        ls -R ${{ runner.temp }}/msys64/mingw64/ssl || true
+        find ${{ runner.temp }}/msys64 -name "ca-bundle.crt" || true
 
-    - name: Building miniupnpc
-      run: |
-        cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
-        make -f Makefile.mingw CC=gcc CXX=g++ libminiupnpc.a V=1
-        cd ../../../../..
 
-    - name: Building libnatpmp
-      run: |
-        cd ./vendor/nim-nat-traversal/vendor/libnatpmp-upstream
-        make CC="gcc -fPIC -D_WIN32_WINNT=0x0600 -DNATPMP_STATICLIB" libnatpmp.a V=1
-        cd ../../../../
+    - name: Make update
+      run: make update
+      env:
+        SSL_CERT_FILE: ${{ runner.temp }}\msys64\mingw64\ssl\certs\ca-bundle.crt
 
     - name: Building wakunode2.exe
       run: |

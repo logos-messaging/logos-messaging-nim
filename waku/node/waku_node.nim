@@ -87,6 +87,8 @@ const clientId* = "Nimbus Waku v2 node"
 
 const WakuNodeVersionString* = "version / git commit hash: " & git_version
 
+## Dummy change
+
 # key and crypto modules different
 type
   # TODO: Move to application instance (e.g., `WakuNode2`)

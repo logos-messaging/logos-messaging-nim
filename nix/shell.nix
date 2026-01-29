@@ -1,4 +1,7 @@
-{ pkgs  }:
+{
+  pkgs ? import <nixpkgs> { },
+  nim ? null,
+}:
 
 pkgs.mkShell {
   inputsFrom = [
@@ -10,10 +13,10 @@ pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git
+    nim
     cargo
     rustup
     rustc
     cmake
-    nim-unwrapped-2_2
   ];
 }

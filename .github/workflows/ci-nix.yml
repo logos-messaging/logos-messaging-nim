@@ -39,7 +39,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 'Run Nix build for {{ matrix.nixpkg }}'
+      - name: 'Run Nix build for ${{ matrix.nixpkg }}'
         shell: bash
         run: nix build -L '.?submodules=1#${{ matrix.nixpkg }}'
 

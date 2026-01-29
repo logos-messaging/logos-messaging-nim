@@ -20,7 +20,8 @@ import
   ./connection_status,
   ./protocol_health,
   ../../api/types,
-  ../../events/health_events
+  ../../events/health_events,
+  ../../events/peer_events
 
 ## This module is aimed to check the state of the "self" Waku Node
 
@@ -42,8 +43,10 @@ type NodeHealthMonitor* = ref object
   connectionStatus: ConnectionStatus
   onConnectionStatusChange*: ConnectionStatusChangeHandler
   cachedProtocols: seq[ProtocolHealth]
-  strength: Table[WakuProtocol, int] ## latest connectivity strength (e.g. peer count) for a protocol
+  strength: Table[WakuProtocol, int]
+    ## latest connectivity strength (e.g. peer count) for a protocol
   relayObserver: PubSubObserver
+  peerEventListener: EventWakuPeerListener
 
 func getHealth*(report: HealthReport, kind: WakuProtocol): ProtocolHealth =
   for h in report.protocolsHealth:
@@ -521,14 +524,6 @@ proc getSyncNodeHealthReport*(hm: NodeHealthMonitor): HealthReport =
   report.protocolsHealth = hm.cachedProtocols
   return report
 
-proc onPeerEvent(hm: NodeHealthMonitor, peerId: PeerId, event: PeerEvent) {.async.} =
-  case event.kind
-  of PeerEventKind.Joined, PeerEventKind.Left, PeerEventKind.Identified:
-    # recomputing node health when peer connection events of interest trigger
-    hm.healthUpdateEvent.fire()
-  else:
-    discard
-
 proc onRelayMsg(
     hm: NodeHealthMonitor, peer: PubSubPeer, msg: var RPCMsg
 ) {.gcsafe, raises: [].} =
@@ -724,17 +719,12 @@ proc startHealthMonitor*(hm: NodeHealthMonitor): Result[void, string] =
     )
     hm.node.wakuRelay.addObserver(hm.relayObserver)
 
-  proc handlePeerEvent(
-      peerId: PeerId, event: PeerEvent
-  ): Future[void] {.gcsafe, async: (raises: [CancelledError]).} =
-    try:
-      await hm.onPeerEvent(peerId, event)
-    except:
-      error "exception in health monitor onPeerEvent: " & getCurrentExceptionMsg()
-
-  hm.node.peerManager.addExtPeerEventHandler(handlePeerEvent, PeerEventKind.Joined)
-  hm.node.peerManager.addExtPeerEventHandler(handlePeerEvent, PeerEventKind.Left)
-  hm.node.peerManager.addExtPeerEventHandler(handlePeerEvent, PeerEventKind.Identified)
+  hm.peerEventListener = EventWakuPeer.listen(
+    hm.node.brokerCtx,
+    proc(evt: EventWakuPeer): Future[void] {.async: (raises: []), gcsafe.} =
+      hm.healthUpdateEvent.fire(),
+  ).valueOr:
+    return err("Failed to subscribe to peer events: " & error)
 
   hm.healthUpdateEvent = newAsyncEvent()
   hm.healthUpdateEvent.fire()
@@ -754,6 +744,9 @@ proc stopHealthMonitor*(hm: NodeHealthMonitor) {.async.} =
 
   if not isNil(hm.healthLoopFut):
     await hm.healthLoopFut.cancelAndWait()
+
+  if hm.peerEventListener.id != 0:
+    EventWakuPeer.dropListener(hm.node.brokerCtx, hm.peerEventListener)
 
   if not isNil(hm.node.wakuRelay) and not isNil(hm.relayObserver):
     hm.node.wakuRelay.removeObserver(hm.relayObserver)

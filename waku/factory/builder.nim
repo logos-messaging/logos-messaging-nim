@@ -15,7 +15,8 @@ import
   ../waku_node,
   ../node/peer_manager,
   ../common/rate_limit/setting,
-  ../common/utils/parse_size_units
+  ../common/utils/parse_size_units,
+  ../common/broker/broker_context
 
 type
   WakuNodeBuilder* = object # General
@@ -204,6 +205,7 @@ proc build*(builder: WakuNodeBuilder): Result[WakuNode, string] =
 
   let peerManager = PeerManager.new(
     switch = switch,
+    brokerCtx = globalBrokerContext(),
     storage = builder.peerStorage.get(nil),
     maxRelayPeers = some(builder.maxRelayPeers),
     maxServicePeers = some(builder.maxServicePeers),

@@ -32,7 +32,7 @@ proc noopRawHandler*(): WakuRelayHandler =
   handler
 
 proc newTestWakuRelay*(switch = newTestSwitch()): Future[WakuRelay] {.async.} =
-  let proto = WakuRelay.new(switch, globalBrokerContext()).tryGet()
+  let proto = WakuRelay.new(switch).tryGet()
 
   let protocolMatcher = proc(proto: string): bool {.gcsafe.} =
     return proto.startsWith(WakuRelayCodec)

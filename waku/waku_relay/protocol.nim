@@ -24,7 +24,8 @@ import
   waku/requests/health_request,
   waku/events/health_events,
   ./message_id,
-  waku/common/broker/broker_context
+  waku/common/broker/broker_context,
+  waku/events/peer_events
 
 from ../waku_core/codecs import WakuRelayCodec
 export WakuRelayCodec
@@ -156,6 +157,7 @@ type
   ): Future[ValidationResult] {.gcsafe, raises: [Defect].}
   WakuRelay* = ref object of GossipSub
     brokerCtx: BrokerContext
+    peerEventListener: EventWakuPeerListener
     # seq of tuples: the first entry in the tuple contains the validators are called for every topic
     # the second entry contains the error messages to be returned when the validator fails
     wakuValidators: seq[tuple[handler: WakuValidatorHandler, errorMessage: string]]
@@ -362,7 +364,7 @@ proc initRequestProviders(w: WakuRelay) =
 proc new*(
     T: type WakuRelay,
     switch: Switch,
-    brokerCtx: BrokerContext,
+    brokerCtx: BrokerContext = globalBrokerContext(),
     maxMessageSize = int(DefaultMaxWakuMessageSize),
 ): WakuRelayResult[T] =
   ## maxMessageSize: max num bytes that are allowed for the WakuMessage
@@ -390,16 +392,15 @@ proc new*(
     w.initRelayObservers()
     w.initRequestProviders()
 
-    # TODO: health monitor and waku relay should maybe feed on a new PeerManager
-    #       EventBroker event for peers joined, left and identified instead of
-    #       hooking into libp2p directly
-    proc onPeerLeft(
-        peerId: PeerId, event: PeerEvent
-    ): Future[void] {.gcsafe, async: (raises: [CancelledError]).} =
-      w.topicHealthCheckAll = true
-      w.topicHealthUpdateEvent.fire()
-
-    w.switch.addPeerEventHandler(onPeerLeft, PeerEventKind.Left)
+    w.peerEventListener = EventWakuPeer.listen(
+      w.brokerCtx,
+      proc(evt: EventWakuPeer): Future[void] {.async: (raises: []), gcsafe.} =
+        if evt.kind == PeerEventKind.Left:
+          w.topicHealthCheckAll = true
+          w.topicHealthUpdateEvent.fire()
+      ,
+    ).valueOr:
+      return err("Failed to subscribe to peer events: " & error)
   except InitializationError:
     return err("initialization error: " & getCurrentExceptionMsg())
 
@@ -538,6 +539,10 @@ method start*(w: WakuRelay) {.async, base.} =
 method stop*(w: WakuRelay) {.async, base.} =
   info "stop"
   await procCall GossipSub(w).stop()
+
+  if w.peerEventListener.id != 0:
+    EventWakuPeer.dropListener(w.brokerCtx, w.peerEventListener)
+
   if not w.topicHealthLoopHandle.isNil():
     await w.topicHealthLoopHandle.cancelAndWait()
 

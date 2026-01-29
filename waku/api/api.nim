@@ -28,7 +28,7 @@ proc checkApiAvailability(w: Waku): Result[void, string] =
   let req = RequestConnectionStatus.request(w.brokerCtx).valueOr:
     return err("Could not retrieve node connection status: " & $error)
 
-  if req.get().connectionStatus == ConnectionStatus.Disconnected:
+  if req.connectionStatus == ConnectionStatus.Disconnected:
     return err("Waku node is disconnected.")
 
   return ok()

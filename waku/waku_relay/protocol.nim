@@ -5,7 +5,7 @@
 {.push raises: [].}
 
 import
-  std/[strformat, strutils],
+  std/[strformat, strutils, sets],
   stew/byteutils,
   results,
   sequtils,
@@ -17,8 +17,15 @@ import
   libp2p/protocols/pubsub/rpc/messages,
   libp2p/stream/connection,
   libp2p/switch
+
 import
-  ../waku_core, ./message_id, ./topic_health, ../node/delivery_monitor/publish_observer
+  waku/waku_core,
+  waku/node/health_monitor/topic_health,
+  waku/requests/health_request,
+  waku/events/health_events,
+  ./message_id,
+  waku/common/broker/broker_context,
+  waku/events/peer_events
 
 from ../waku_core/codecs import WakuRelayCodec
 export WakuRelayCodec
@@ -149,6 +156,8 @@ type
     pubsubTopic: PubsubTopic, message: WakuMessage
   ): Future[ValidationResult] {.gcsafe, raises: [Defect].}
   WakuRelay* = ref object of GossipSub
+    brokerCtx: BrokerContext
+    peerEventListener: EventWakuPeerListener
     # seq of tuples: the first entry in the tuple contains the validators are called for every topic
     # the second entry contains the error messages to be returned when the validator fails
     wakuValidators: seq[tuple[handler: WakuValidatorHandler, errorMessage: string]]
@@ -157,10 +166,14 @@ type
       # map topic with its assigned validator within pubsub
     topicHandlers: Table[PubsubTopic, TopicHandler]
       # map topic with the TopicHandler proc in charge of attending topic's incoming message events
-    publishObservers: seq[PublishObserver]
     topicsHealth*: Table[string, TopicHealth]
     onTopicHealthChange*: TopicHealthChangeHandler
     topicHealthLoopHandle*: Future[void]
+    topicHealthUpdateEvent: AsyncEvent
+    topicHealthDirty: HashSet[string]
+      # list of topics that need their health updated in the update event
+    topicHealthCheckAll: bool
+      # true if all topics need to have their health status refreshed in the update event
     msgMetricsPerShard*: Table[string, ShardMetrics]
 
 # predefinition for more detailed results from publishing new message
@@ -283,6 +296,21 @@ proc initRelayObservers(w: WakuRelay) =
       )
 
   proc onRecv(peer: PubSubPeer, msgs: var RPCMsg) =
+    if msgs.control.isSome:
+      let ctrl = msgs.control.get()
+      var topicsChanged = false
+
+      for graft in ctrl.graft:
+        w.topicHealthDirty.incl(graft.topicID)
+        topicsChanged = true
+
+      for prune in ctrl.prune:
+        w.topicHealthDirty.incl(prune.topicID)
+        topicsChanged = true
+
+      if topicsChanged:
+        w.topicHealthUpdateEvent.fire()
+
     for msg in msgs.messages:
       let (msg_id_short, topic, wakuMessage, msgSize) = decodeRpcMessageInfo(peer, msg).valueOr:
         continue
@@ -321,8 +349,23 @@ proc initRelayObservers(w: WakuRelay) =
 
   w.addObserver(administrativeObserver)
 
+proc initRequestProviders(w: WakuRelay) =
+  RequestRelayTopicsHealth.setProvider(
+    w.brokerCtx,
+    proc(topics: seq[PubsubTopic]): Result[RequestRelayTopicsHealth, string] =
+      var collectedRes: RequestRelayTopicsHealth
+      for topic in topics:
+        let health = w.topicsHealth.getOrDefault(topic, TopicHealth.NOT_SUBSCRIBED)
+        collectedRes.topicHealth.add((topic, health))
+      return ok(collectedRes),
+  ).isOkOr:
+    error "Cannot set Relay Topics Health request provider", error = error
+
 proc new*(
-    T: type WakuRelay, switch: Switch, maxMessageSize = int(DefaultMaxWakuMessageSize)
+    T: type WakuRelay,
+    switch: Switch,
+    brokerCtx: BrokerContext = globalBrokerContext(),
+    maxMessageSize = int(DefaultMaxWakuMessageSize),
 ): WakuRelayResult[T] =
   ## maxMessageSize: max num bytes that are allowed for the WakuMessage
 
@@ -338,11 +381,26 @@ proc new*(
       maxMessageSize = maxMessageSize,
       parameters = GossipsubParameters,
     )
+    w.brokerCtx = brokerCtx
 
     procCall GossipSub(w).initPubSub()
+    w.topicsHealth = initTable[string, TopicHealth]()
+    w.topicHealthUpdateEvent = newAsyncEvent()
+    w.topicHealthDirty = initHashSet[string]()
+    w.topicHealthCheckAll = false
     w.initProtocolHandler()
     w.initRelayObservers()
-    w.topicsHealth = initTable[string, TopicHealth]()
+    w.initRequestProviders()
+
+    w.peerEventListener = EventWakuPeer.listen(
+      w.brokerCtx,
+      proc(evt: EventWakuPeer): Future[void] {.async: (raises: []), gcsafe.} =
+        if evt.kind == PeerEventKind.Left:
+          w.topicHealthCheckAll = true
+          w.topicHealthUpdateEvent.fire()
+      ,
+    ).valueOr:
+      return err("Failed to subscribe to peer events: " & error)
   except InitializationError:
     return err("initialization error: " & getCurrentExceptionMsg())
 
@@ -352,12 +410,6 @@ proc addValidator*(
     w: WakuRelay, handler: WakuValidatorHandler, errorMessage: string = ""
 ) {.gcsafe.} =
   w.wakuValidators.add((handler, errorMessage))
-
-proc addPublishObserver*(w: WakuRelay, obs: PublishObserver) =
-  ## Observer when the api client performed a publish operation. This
-  ## is initially aimed for bringing an additional layer of delivery reliability thanks
-  ## to store
-  w.publishObservers.add(obs)
 
 proc addObserver*(w: WakuRelay, observer: PubSubObserver) {.gcsafe.} =
   ## Observes when a message is sent/received from the GossipSub PoV
@@ -426,38 +478,58 @@ proc calculateTopicHealth(wakuRelay: WakuRelay, topic: string): TopicHealth =
     return TopicHealth.MINIMALLY_HEALTHY
   return TopicHealth.SUFFICIENTLY_HEALTHY
 
-proc updateTopicsHealth(wakuRelay: WakuRelay) {.async.} =
-  var futs = newSeq[Future[void]]()
-  for topic in toSeq(wakuRelay.topics.keys):
-    ## loop over all the topics I'm subscribed to
-    let
-      oldHealth = wakuRelay.topicsHealth.getOrDefault(topic)
-      currentHealth = wakuRelay.calculateTopicHealth(topic)
+proc isSubscribed*(w: WakuRelay, topic: PubsubTopic): bool =
+  GossipSub(w).topics.hasKey(topic)
 
-    if oldHealth == currentHealth:
-      continue
+proc subscribedTopics*(w: WakuRelay): seq[PubsubTopic] =
+  return toSeq(GossipSub(w).topics.keys())
 
-    wakuRelay.topicsHealth[topic] = currentHealth
-    if not wakuRelay.onTopicHealthChange.isNil():
-      let fut = wakuRelay.onTopicHealthChange(topic, currentHealth)
-      if not fut.completed(): # Fast path for successful sync handlers
-        futs.add(fut)
+proc topicsHealthLoop(w: WakuRelay) {.async.} =
+  while true:
+    await w.topicHealthUpdateEvent.wait()
+    w.topicHealthUpdateEvent.clear()
+
+    var topicsToCheck: seq[string]
+
+    if w.topicHealthCheckAll:
+      topicsToCheck = toSeq(w.topics.keys)
+    else:
+      topicsToCheck = toSeq(w.topicHealthDirty)
+
+    w.topicHealthCheckAll = false
+    w.topicHealthDirty.clear()
+
+    var futs = newSeq[Future[void]]()
+
+    for topic in topicsToCheck:
+      # guard against topic being unsubscribed since fire()
+      if not w.isSubscribed(topic):
+        continue
+
+      let
+        oldHealth = w.topicsHealth.getOrDefault(topic, TopicHealth.UNHEALTHY)
+        currentHealth = w.calculateTopicHealth(topic)
+
+      if oldHealth == currentHealth:
+        continue
+
+      w.topicsHealth[topic] = currentHealth
+
+      EventRelayTopicHealthChange.emit(w.brokerCtx, topic, currentHealth)
+
+      if not w.onTopicHealthChange.isNil():
+        futs.add(w.onTopicHealthChange(topic, currentHealth))
 
     if futs.len() > 0:
-      # slow path - we have to wait for the handlers to complete
       try:
-        futs = await allFinished(futs)
+        discard await allFinished(futs)
       except CancelledError:
-        # check for errors in futures
-        for fut in futs:
-          if fut.failed:
-            let err = fut.readError()
-            warn "Error in health change handler", description = err.msg
+        break
+      except CatchableError as e:
+        warn "Error in topic health callback", error = e.msg
 
-proc topicsHealthLoop(wakuRelay: WakuRelay) {.async.} =
-  while true:
-    await wakuRelay.updateTopicsHealth()
-    await sleepAsync(10.seconds)
+    # safety cooldown to protect from edge cases
+    await sleepAsync(100.milliseconds)
 
 method start*(w: WakuRelay) {.async, base.} =
   info "start"
@@ -467,14 +539,12 @@ method start*(w: WakuRelay) {.async, base.} =
 method stop*(w: WakuRelay) {.async, base.} =
   info "stop"
   await procCall GossipSub(w).stop()
+
+  if w.peerEventListener.id != 0:
+    EventWakuPeer.dropListener(w.brokerCtx, w.peerEventListener)
+
   if not w.topicHealthLoopHandle.isNil():
     await w.topicHealthLoopHandle.cancelAndWait()
-
-proc isSubscribed*(w: WakuRelay, topic: PubsubTopic): bool =
-  GossipSub(w).topics.hasKey(topic)
-
-proc subscribedTopics*(w: WakuRelay): seq[PubsubTopic] =
-  return toSeq(GossipSub(w).topics.keys())
 
 proc generateOrderedValidator(w: WakuRelay): ValidatorHandler {.gcsafe.} =
   # rejects messages that are not WakuMessage
@@ -573,6 +643,8 @@ proc subscribe*(w: WakuRelay, pubsubTopic: PubsubTopic, handler: WakuRelayHandle
   procCall GossipSub(w).subscribe(pubsubTopic, topicHandler)
 
   w.topicHandlers[pubsubTopic] = topicHandler
+  w.topicHealthDirty.incl(pubsubTopic)
+  w.topicHealthUpdateEvent.fire()
 
 proc unsubscribeAll*(w: WakuRelay, pubsubTopic: PubsubTopic) =
   ## Unsubscribe all handlers on this pubsub topic
@@ -582,6 +654,8 @@ proc unsubscribeAll*(w: WakuRelay, pubsubTopic: PubsubTopic) =
   procCall GossipSub(w).unsubscribeAll(pubsubTopic)
   w.topicValidator.del(pubsubTopic)
   w.topicHandlers.del(pubsubTopic)
+  w.topicsHealth.del(pubsubTopic)
+  w.topicHealthDirty.excl(pubsubTopic)
 
 proc unsubscribe*(w: WakuRelay, pubsubTopic: PubsubTopic) =
   if not w.topicValidator.hasKey(pubsubTopic):
@@ -607,6 +681,8 @@ proc unsubscribe*(w: WakuRelay, pubsubTopic: PubsubTopic) =
 
   w.topicValidator.del(pubsubTopic)
   w.topicHandlers.del(pubsubTopic)
+  w.topicsHealth.del(pubsubTopic)
+  w.topicHealthDirty.excl(pubsubTopic)
 
 proc publish*(
     w: WakuRelay, pubsubTopic: PubsubTopic, wakuMessage: WakuMessage
@@ -627,9 +703,6 @@ proc publish*(
 
   if relayedPeerCount <= 0:
     return err(NoPeersToPublish)
-
-  for obs in w.publishObservers:
-    obs.onMessagePublished(pubSubTopic, message)
 
   return ok(relayedPeerCount)
 

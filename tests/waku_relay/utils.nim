@@ -19,6 +19,7 @@ import
       waku_core,
       waku_node,
       waku_rln_relay,
+      common/broker/broker_context,
     ],
   ../waku_store/store_utils,
   ../waku_archive/archive_utils,

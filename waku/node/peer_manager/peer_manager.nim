@@ -15,6 +15,8 @@ import
   ../../common/enr,
   ../../common/callbacks,
   ../../common/utils/parse_size_units,
+  ../../common/broker/broker_context,
+  ../../events/peer_events,
   ../../waku_core,
   ../../waku_relay,
   ../../waku_relay/protocol,
@@ -85,6 +87,7 @@ type ConnectionChangeHandler* = proc(
 
 type PeerManager* = ref object of RootObj
   switch*: Switch
+  brokerCtx: BrokerContext
   wakuMetadata*: WakuMetadata
   initialBackoffInSec*: int
   backoffFactor*: int
@@ -708,6 +711,8 @@ proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
           asyncSpawn(pm.switch.disconnect(peerId))
           peerStore.delete(peerId)
 
+    EventWakuPeer.emit(pm.brokerCtx, peerId, Joined)
+
     if not pm.onConnectionChange.isNil():
       # we don't want to await for the callback to finish
       asyncSpawn pm.onConnectionChange(peerId, Joined)
@@ -723,11 +728,15 @@ proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
           pm.ipTable.del(ip)
         break
 
+    EventWakuPeer.emit(pm.brokerCtx, peerId, Left)
+
     if not pm.onConnectionChange.isNil():
       # we don't want to await for the callback to finish
       asyncSpawn pm.onConnectionChange(peerId, Left)
   of Identified:
     info "event identified", peerId = peerId
+
+    EventWakuPeer.emit(pm.brokerCtx, peerId, Identified)
 
   peerStore[ConnectionBook][peerId] = connectedness
   peerStore[DirectionBook][peerId] = direction
@@ -1038,6 +1047,7 @@ proc stop*(pm: PeerManager) =
 proc new*(
     T: type PeerManager,
     switch: Switch,
+    brokerCtx: BrokerContext = globalBrokerContext(),
     wakuMetadata: WakuMetadata = nil,
     maxRelayPeers: Option[int] = none(int),
     maxServicePeers: Option[int] = none(int),
@@ -1087,6 +1097,7 @@ proc new*(
 
   let pm = PeerManager(
     switch: switch,
+    brokerCtx: brokerCtx,
     wakuMetadata: wakuMetadata,
     storage: storage,
     initialBackoffInSec: initialBackoffInSec,

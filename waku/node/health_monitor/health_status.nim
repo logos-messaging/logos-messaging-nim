@@ -1,4 +1,4 @@
-import results, std/strutils
+import chronos, results, std/strutils
 
 type HealthStatus* {.pure.} = enum
   INITIALIZING
@@ -14,3 +14,4 @@ proc init*(t: typedesc[HealthStatus], strRep: string): Result[HealthStatus, stri
     return ok(status)
   except ValueError:
     return err("Invalid HealthStatus string representation: " & strRep)
+

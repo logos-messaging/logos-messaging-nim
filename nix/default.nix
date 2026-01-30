@@ -18,9 +18,14 @@ assert pkgs.lib.assertMsg ((src.submodules or true) == true)
 
 let
   inherit (pkgs) stdenv lib writeScriptBin callPackage;
+  inherit (lib) any match substring optionals;
 
-  tools = pkgs.callPackage ./tools.nix {};
-  revision = lib.substring 0 8 (src.rev or src.dirtyRev or "00000000");
+  # Check if build is for android platform.
+  containsAndroid = s: (match ".*android.*" s) != null;
+  isAndroidBuild = any containsAndroid targets;
+
+  tools = callPackage ./tools.nix {};
+  revision = substring 0 8 (src.rev or src.dirtyRev or "00000000");
   version = tools.findKeyValue "^version = \"([a-f0-9.-]+)\"$" ../waku.nimble;
 
   androidManifest = "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"com.example.mylibrary\" />";
@@ -42,7 +47,7 @@ in stdenv.mkDerivation {
     fakeGit = writeScriptBin "git" "echo ${version}";
   in with pkgs; [
     nim cmake which zerokitRln nim-unwrapped-2_2 fakeGit
-  ] ++ lib.optionals stdenv.isDarwin [
+  ] ++ optionals stdenv.isDarwin [
     pkgs.darwin.cctools gcc # Necessary for libbacktrace
   ];
 

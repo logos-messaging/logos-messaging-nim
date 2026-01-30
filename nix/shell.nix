@@ -6,9 +6,6 @@
 pkgs.mkShell {
   inputsFrom = [
     pkgs.androidShell
-  ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-    pkgs.libiconv
-    pkgs.darwin.apple_sdk.frameworks.Security
   ];
 
   buildInputs = with pkgs; [
@@ -18,5 +15,8 @@ pkgs.mkShell {
     rustup
     rustc
     cmake
+  ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+    pkgs.libiconv
+    pkgs.darwin.apple_sdk.frameworks.Security
   ];
 }

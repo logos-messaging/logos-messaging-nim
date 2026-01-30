@@ -147,12 +147,22 @@ LIBBACKTRACE_PATH := $(shell nimble path libbacktrace 2>/dev/null)
 
 libbacktrace:
 ifneq ($(LIBBACKTRACE_PATH),)
-	+ $(MAKE) -C $(LIBBACKTRACE_PATH) --no-print-directory BUILD_CXX_LIB=0
+	@# Check if library already exists (nimble install creates pre-built artifacts)
+	@if [ -f "$(LIBBACKTRACE_PATH)/install/usr/lib/libbacktrace.a" ]; then \
+		echo "libbacktrace already built"; \
+	elif [ -f "$(LIBBACKTRACE_PATH)/Makefile" ]; then \
+		$(MAKE) -C $(LIBBACKTRACE_PATH) --no-print-directory BUILD_CXX_LIB=0; \
+	else \
+		echo "Warning: libbacktrace Makefile not found, library may not be properly installed"; \
+		echo "Try: rm -rf ~/.nimble/pkgs2/libbacktrace* && nimble install -y libbacktrace"; \
+	fi
 endif
 
 clean-libbacktrace:
 ifneq ($(LIBBACKTRACE_PATH),)
-	+ $(MAKE) -C $(LIBBACKTRACE_PATH) clean $(HANDLE_OUTPUT)
+	@if [ -f "$(LIBBACKTRACE_PATH)/Makefile" ]; then \
+		$(MAKE) -C $(LIBBACKTRACE_PATH) clean $(HANDLE_OUTPUT); \
+	fi
 endif
 
 # Get nat-traversal path from nimble for building native libs

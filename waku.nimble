@@ -1,6 +1,6 @@
 #!fmt: off
 
-import os
+import os, strutils
 mode = ScriptMode.Verbose
 
 ### Package
@@ -70,11 +70,11 @@ proc getNimblePath(pkgName: string): string =
 proc buildModule(filePath, params = "", lang = "c"): bool =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
+  # Filter out nimble's internal params, only pass compiler flags
   var extra_params = params
   for i in 2 ..< paramCount() - 1:
     let param = paramStr(i)
-    # Skip nimble config files and task names - only pass compiler flags
+    # Skip nimble config files
     if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
       continue
     # Only pass actual compiler flags (those starting with -)
@@ -95,11 +95,11 @@ proc buildModule(filePath, params = "", lang = "c"): bool =
 proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
+  # Filter out nimble's internal params, only pass compiler flags
   var extra_params = params
   for i in 2 ..< paramCount():
     let param = paramStr(i)
-    # Skip nimble config files and task names - only pass compiler flags
+    # Skip nimble config files
     if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
       continue
     # Only pass actual compiler flags (those starting with -)
@@ -114,8 +114,23 @@ proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static
     mkDir "build"
   # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
   var extra_params = params
-  for i in 2 ..< (paramCount() - 1):
-    extra_params &= " " & paramStr(i)
+  # Iterate through all params to capture all compiler flags including --passL
+  for i in 2 .. paramCount():
+    let param = paramStr(i)
+    # Skip nimble config files
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Skip standalone library files (but not --passL flags referencing them)
+    if not param.startsWith("-"):
+      if param.endsWith(".dylib") or param.endsWith(".a") or param.endsWith(".lib") or param.endsWith(".so"):
+        continue
+    # Skip task names
+    if param == "libwakuStatic" or param == "libwakuDynamic":
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
   if `type` == "static":
     exec "nim c" & " --out:build/" & lib_name &
       " --threads:on --app:staticlib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:libwaku --skipParentCfg:on -d:discv5_protocol_id=d5waku " &
@@ -133,9 +148,17 @@ proc buildMobileAndroid(srcDir = ".", params = "") =
   if not dirExists outDir:
     mkDir outDir
 
+  # Filter out nimble's internal params, only pass compiler flags
   var extra_params = params
   for i in 2 ..< paramCount():
-    extra_params &= " " & paramStr(i)
+    let param = paramStr(i)
+    # Skip nimble config files
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
 
   exec "nim c" & " --out:" & outDir &
     "/libwaku.so --threads:on --app:lib --opt:size --noMain --mm:refc -d:chronicles_sinks=textlines[dynamic] --header -d:chronosEventEngine=epoll --passL:-L" &
@@ -233,7 +256,7 @@ task buildTest, "Test custom target":
   let filepath = paramStr(paramCount())
   discard buildModule(filepath)
 
-import std/strutils
+# strutils already imported at top of file
 
 task execTest, "Run test":
   # Expects to be parameterized with test case name in quotes
@@ -254,11 +277,45 @@ let chroniclesParams =
   "--warning:UnusedImport:on " & "-d:chronicles_log_level=TRACE"
 
 task libwakuStatic, "Build the cbindings waku node library":
-  let lib_name = paramStr(paramCount())
+  # Find the library name - it's the first non-flag argument after the task name
+  var lib_name = ""
+  var foundTask = false
+  for i in 0..paramCount():
+    let param = paramStr(i)
+    if param == "libwakuStatic":
+      foundTask = true
+      continue
+    if foundTask and not param.startsWith("-") and not param.startsWith("--"):
+      lib_name = param
+      break
+  if lib_name == "":
+    # Use platform-appropriate extension for fallback
+    when defined(windows):
+      lib_name = "libwaku.lib"
+    else:
+      lib_name = "libwaku.a"  # .a works for both macOS and Linux
   buildLibrary lib_name, "library/", chroniclesParams, "static"
 
 task libwakuDynamic, "Build the cbindings waku node library":
-  let lib_name = paramStr(paramCount())
+  # Find the library name - it's the first non-flag argument after the task name
+  var lib_name = ""
+  var foundTask = false
+  for i in 0..paramCount():
+    let param = paramStr(i)
+    if param == "libwakuDynamic":
+      foundTask = true
+      continue
+    if foundTask and not param.startsWith("-") and not param.startsWith("--"):
+      lib_name = param
+      break
+  if lib_name == "":
+    # Use platform-appropriate extension for fallback
+    when defined(macosx):
+      lib_name = "libwaku.dylib"
+    elif defined(windows):
+      lib_name = "libwaku.dll"
+    else:
+      lib_name = "libwaku.so"
   buildLibrary lib_name, "library/", chroniclesParams, "dynamic"
 
 ### Mobile Android

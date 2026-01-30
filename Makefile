@@ -65,10 +65,13 @@ waku.nims:
 	ln -s waku.nimble $@
 
 update: | waku.nims
+	git submodule update --init --recursive
 	nimble setup && nimble sync
 	$(MAKE) build-nph
 
 clean:
+	rm -rf ~/.nimble/pkg*
+	git clean -fdx
 	rm -rf build
 
 build:

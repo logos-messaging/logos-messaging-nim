@@ -91,7 +91,7 @@ if not defined(macosx) and not defined(android):
     # light-weight stack traces using libbacktrace and libunwind
     --define:
       nimStackTraceOverride
-    switch("import", "libbacktrace")
+    # Note: libbacktrace import moved to after nimble paths are loaded (see below)
 
 --define:
   nimOldCaseObjects
@@ -124,3 +124,8 @@ if defined(android):
 when withDir(thisDir(), system.fileExists("nimble.paths")):
   include "nimble.paths"
 # end Nimble config
+
+# Import libbacktrace for stack traces (must be after nimble paths are loaded)
+if not defined(macosx) and not defined(android):
+  if not (defined(windows) and defined(i386)) and not defined(disable_libbacktrace):
+    switch("import", "libbacktrace")

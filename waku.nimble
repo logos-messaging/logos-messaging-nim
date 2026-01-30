@@ -73,7 +73,14 @@ proc buildModule(filePath, params = "", lang = "c"): bool =
   # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
   var extra_params = params
   for i in 2 ..< paramCount() - 1:
-    extra_params &= " " & paramStr(i)
+    let param = paramStr(i)
+    # Skip nimble config files and task names - only pass compiler flags
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
 
   if not fileExists(filePath):
     echo "File to build not found: " & filePath
@@ -91,7 +98,14 @@ proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
   # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
   var extra_params = params
   for i in 2 ..< paramCount():
-    extra_params &= " " & paramStr(i)
+    let param = paramStr(i)
+    # Skip nimble config files and task names - only pass compiler flags
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
   exec "nim " & lang & " --out:build/" & name & " --mm:refc " & extra_params & " " &
     srcDir & name & ".nim"
 

@@ -9,7 +9,12 @@ import
   libp2p/stream/bufferstream,
   libp2p/stream/connection,
   libp2p/crypto/crypto
-import waku/waku_core, waku/waku_node, ./testlib/wakucore, ./testlib/wakunode
+import
+  waku/waku_core,
+  waku/waku_node,
+  waku/node/peer_manager,
+  ./testlib/wakucore,
+  ./testlib/wakunode
 
 suite "Waku Keepalive":
   asyncTest "handle ping keepalives":
@@ -22,7 +27,7 @@ suite "Waku Keepalive":
     var completionFut = newFuture[bool]()
 
     proc pingHandler(peerId: PeerID) {.async, gcsafe.} =
-      info "Ping received"
+      info "Ping received", peerId, node1PeerId = node1.switch.peerInfo.peerId
       let checkPeerIdMatch = peerId == node1.switch.peerInfo.peerId
       completionFut.complete(checkPeerIdMatch)
 

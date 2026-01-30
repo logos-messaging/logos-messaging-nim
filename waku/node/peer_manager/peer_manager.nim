@@ -500,7 +500,7 @@ proc connectedPeers*(
 
   return (inPeers, outPeers)
 
-proc isPeerConnected*(pm: PeerManager, peerId: PeerId): bool
+proc isPeerConnected*(pm: PeerManager, peerId: PeerId): bool =
   let (inPeers, outPeers) = pm.connectedPeers()
   return inPeers.contains(peerId) or outPeers.contains(peerId)
 

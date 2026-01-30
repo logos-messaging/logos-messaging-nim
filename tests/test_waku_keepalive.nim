@@ -47,6 +47,9 @@ suite "Waku Keepalive":
         break
       await sleepAsync(100.millis)
 
+    assert node1.peerManager.isPeerConnected(node2.switch.peerInfo.peerId),
+      "could not establish connection between nodes"
+
     let healthMonitor = NodeHealthMonitor()
     healthMonitor.setNodeToHealthMonitor(node1)
     healthMonitor.startKeepalive(2.seconds).isOkOr:

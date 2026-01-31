@@ -65,7 +65,6 @@ waku.nims:
 	ln -s waku.nimble $@
 
 update: | waku.nims
-	git submodule update --init --recursive
 	nimble setup && nimble sync
 	$(MAKE) build-nph
 
@@ -222,11 +221,19 @@ librln: | $(LIBRLN_FILE)
 	$(eval NIM_PARAMS += --passL:$(LIBRLN_FILE) --passL:-lm)
 
 clean-librln:
-	cargo clean --manifest-path vendor/zerokit/rln/Cargo.toml
+	@if [ -f "vendor/zerokit/rln/Cargo.toml" ]; then \
+		cargo clean --manifest-path vendor/zerokit/rln/Cargo.toml; \
+	fi
 	rm -f $(LIBRLN_FILE)
 
 # Extend clean target
 clean: | clean-librln
+
+# Clone vendor repos for development (builds from source automatically when present)
+vendors:
+	@mkdir -p vendor
+	@[ -d "vendor/zerokit/.git" ] || git clone --branch v0.5.1 https://github.com/vacp2p/zerokit.git vendor/zerokit
+	@[ -d "vendor/waku-rlnv2-contract/.git" ] || git clone https://github.com/logos-messaging/waku-rlnv2-contract.git vendor/waku-rlnv2-contract
 
 #################
 ## Waku Common ##

@@ -1,6 +1,6 @@
 #!fmt: off
 
-import os
+import os, strutils
 mode = ScriptMode.Verbose
 
 ### Package
@@ -33,16 +33,54 @@ requires "nim >= 2.2.4",
   "minilru",
   "lsquic",
   "jwt",
-  "ffi"
+  "ffi",
+  # Transitive dependencies
+  "bearssl",
+  "secp256k1",
+  "nat_traversal",
+  "faststreams",
+  "json_serialization",
+  "http_utils",
+  "websock",
+  "dnsclient",
+  "toml_serialization",
+  "sqlite3_abi",
+  "taskpools",
+  "unittest2",
+  "testutils",
+  "zlib",
+  "unicodedb"
+
+# Custom fork URLs (for nimble lock)
+# These are automatically used by nimble when resolving dependencies
+# libp2p: https://github.com/vacp2p/nim-libp2p.git
+# lsquic: https://github.com/vacp2p/nim-lsquic.git
+# jwt: https://github.com/vacp2p/nim-jwt.git
+# ffi: https://github.com/logos-messaging/nim-ffi.git
 
 ### Helper functions
+
+# Get the path to a nimble package
+proc getNimblePath(pkgName: string): string =
+  let (output, exitCode) = gorgeEx("nimble path " & pkgName)
+  if exitCode != 0:
+    quit "Failed to get nimble path for " & pkgName
+  result = output.strip()
+
 proc buildModule(filePath, params = "", lang = "c"): bool =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
+  # Filter out nimble's internal params, only pass compiler flags
   var extra_params = params
   for i in 2 ..< paramCount() - 1:
-    extra_params &= " " & paramStr(i)
+    let param = paramStr(i)
+    # Skip nimble config files
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
 
   if not fileExists(filePath):
     echo "File to build not found: " & filePath
@@ -57,10 +95,17 @@ proc buildModule(filePath, params = "", lang = "c"): bool =
 proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
   if not dirExists "build":
     mkDir "build"
-  # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
+  # Filter out nimble's internal params, only pass compiler flags
   var extra_params = params
   for i in 2 ..< paramCount():
-    extra_params &= " " & paramStr(i)
+    let param = paramStr(i)
+    # Skip nimble config files
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
   exec "nim " & lang & " --out:build/" & name & " --mm:refc " & extra_params & " " &
     srcDir & name & ".nim"
 
@@ -69,8 +114,23 @@ proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static
     mkDir "build"
   # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
   var extra_params = params
-  for i in 2 ..< (paramCount() - 1):
-    extra_params &= " " & paramStr(i)
+  # Iterate through all params to capture all compiler flags including --passL
+  for i in 2 .. paramCount():
+    let param = paramStr(i)
+    # Skip nimble config files
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Skip standalone library files (but not --passL flags referencing them)
+    if not param.startsWith("-"):
+      if param.endsWith(".dylib") or param.endsWith(".a") or param.endsWith(".lib") or param.endsWith(".so"):
+        continue
+    # Skip task names
+    if param == "libwakuStatic" or param == "libwakuDynamic":
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
   if `type` == "static":
     exec "nim c" & " --out:build/" & lib_name &
       " --threads:on --app:staticlib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:libwaku --skipParentCfg:on -d:discv5_protocol_id=d5waku " &
@@ -88,9 +148,17 @@ proc buildMobileAndroid(srcDir = ".", params = "") =
   if not dirExists outDir:
     mkDir outDir
 
+  # Filter out nimble's internal params, only pass compiler flags
   var extra_params = params
   for i in 2 ..< paramCount():
-    extra_params &= " " & paramStr(i)
+    let param = paramStr(i)
+    # Skip nimble config files
+    if param.endsWith(".nimble") or param.endsWith(".nims") or param.endsWith(".out"):
+      continue
+    # Only pass actual compiler flags (those starting with -)
+    if not param.startsWith("-"):
+      continue
+    extra_params &= " " & param
 
   exec "nim c" & " --out:" & outDir &
     "/libwaku.so --threads:on --app:lib --opt:size --noMain --mm:refc -d:chronicles_sinks=textlines[dynamic] --header -d:chronosEventEngine=epoll --passL:-L" &
@@ -188,7 +256,7 @@ task buildTest, "Test custom target":
   let filepath = paramStr(paramCount())
   discard buildModule(filepath)
 
-import std/strutils
+# strutils already imported at top of file
 
 task execTest, "Run test":
   # Expects to be parameterized with test case name in quotes
@@ -209,11 +277,45 @@ let chroniclesParams =
   "--warning:UnusedImport:on " & "-d:chronicles_log_level=TRACE"
 
 task libwakuStatic, "Build the cbindings waku node library":
-  let lib_name = paramStr(paramCount())
+  # Find the library name - it's the first non-flag argument after the task name
+  var lib_name = ""
+  var foundTask = false
+  for i in 0..paramCount():
+    let param = paramStr(i)
+    if param == "libwakuStatic":
+      foundTask = true
+      continue
+    if foundTask and not param.startsWith("-") and not param.startsWith("--"):
+      lib_name = param
+      break
+  if lib_name == "":
+    # Use platform-appropriate extension for fallback
+    when defined(windows):
+      lib_name = "libwaku.lib"
+    else:
+      lib_name = "libwaku.a"  # .a works for both macOS and Linux
   buildLibrary lib_name, "library/", chroniclesParams, "static"
 
 task libwakuDynamic, "Build the cbindings waku node library":
-  let lib_name = paramStr(paramCount())
+  # Find the library name - it's the first non-flag argument after the task name
+  var lib_name = ""
+  var foundTask = false
+  for i in 0..paramCount():
+    let param = paramStr(i)
+    if param == "libwakuDynamic":
+      foundTask = true
+      continue
+    if foundTask and not param.startsWith("-") and not param.startsWith("--"):
+      lib_name = param
+      break
+  if lib_name == "":
+    # Use platform-appropriate extension for fallback
+    when defined(macosx):
+      lib_name = "libwaku.dylib"
+    elif defined(windows):
+      lib_name = "libwaku.dll"
+    else:
+      lib_name = "libwaku.so"
   buildLibrary lib_name, "library/", chroniclesParams, "dynamic"
 
 ### Mobile Android
@@ -260,6 +362,15 @@ proc buildMobileIOS(srcDir = ".", params = "") =
   let clangBase = "clang -arch " & iosArch & " -isysroot " & sdkPath &
       " -mios-version-min=18.0 -fembed-bitcode -fPIC -O2"
 
+  # Get nimble package paths for native dependencies
+  let bearSslPkgDir = getNimblePath("bearssl")
+  let secp256k1PkgDir = getNimblePath("secp256k1")
+  let natTraversalPkgDir = getNimblePath("nat_traversal")
+
+  # Get Nim lib path
+  let (nimPath, _) = gorgeEx("nim --verbosity:0 --eval:'echo getCurrentCompilerExe().parentDir.parentDir / \"lib\"'")
+  let nimLibDir = nimPath.strip()
+
   # Generate C sources from Nim (no linking)
   exec "nim c" &
       " --nimcache:" & nimcacheDir &
@@ -277,8 +388,8 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- BearSSL ---
   echo "Compiling BearSSL for iOS..."
-  let bearSslSrcDir = "./vendor/nim-bearssl/bearssl/csources/src"
-  let bearSslIncDir = "./vendor/nim-bearssl/bearssl/csources/inc"
+  let bearSslSrcDir = bearSslPkgDir / "bearssl/csources/src"
+  let bearSslIncDir = bearSslPkgDir / "bearssl/csources/inc"
   for path in walkDirRec(bearSslSrcDir):
     if path.endsWith(".c"):
       let relPath = path.replace(bearSslSrcDir & "/", "").replace("/", "_")
@@ -289,7 +400,7 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- secp256k1 ---
   echo "Compiling secp256k1 for iOS..."
-  let secp256k1Dir = "./vendor/nim-secp256k1/vendor/secp256k1"
+  let secp256k1Dir = secp256k1PkgDir / "vendor/secp256k1"
   let secp256k1Flags = " -I" & secp256k1Dir & "/include" &
         " -I" & secp256k1Dir & "/src" &
         " -I" & secp256k1Dir &
@@ -314,9 +425,9 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- miniupnpc ---
   echo "Compiling miniupnpc for iOS..."
-  let miniupnpcSrcDir = "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/src"
-  let miniupnpcIncDir = "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/include"
-  let miniupnpcBuildDir = "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/build"
+  let miniupnpcSrcDir = natTraversalPkgDir / "vendor/miniupnp/miniupnpc/src"
+  let miniupnpcIncDir = natTraversalPkgDir / "vendor/miniupnp/miniupnpc/include"
+  let miniupnpcBuildDir = natTraversalPkgDir / "vendor/miniupnp/miniupnpc/build"
   let miniupnpcFiles = @[
     "addr_is_reserved.c", "connecthostport.c", "igd_desc_parse.c",
     "minisoap.c", "minissdpc.c", "miniupnpc.c", "miniwget.c",
@@ -337,7 +448,7 @@ proc buildMobileIOS(srcDir = ".", params = "") =
 
   # --- libnatpmp ---
   echo "Compiling libnatpmp for iOS..."
-  let natpmpSrcDir = "./vendor/nim-nat-traversal/vendor/libnatpmp-upstream"
+  let natpmpSrcDir = natTraversalPkgDir / "vendor/libnatpmp-upstream"
   # Only compile natpmp.c - getgateway.c uses net/route.h which is not available on iOS
   let natpmpObj = vendorObjDir / "natpmp_natpmp.o"
   if not fileExists(natpmpObj):
@@ -371,13 +482,13 @@ proc buildMobileIOS(srcDir = ".", params = "") =
     let oFile = objDir / baseName
     exec clangBase &
         " -DENABLE_STRNATPMPERR" &
-        " -I./vendor/nimbus-build-system/vendor/Nim/lib/" &
-        " -I./vendor/nim-bearssl/bearssl/csources/inc/" &
-        " -I./vendor/nim-bearssl/bearssl/csources/tools/" &
-        " -I./vendor/nim-bearssl/bearssl/abi/" &
-        " -I./vendor/nim-secp256k1/vendor/secp256k1/include/" &
-        " -I./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/include/" &
-        " -I./vendor/nim-nat-traversal/vendor/libnatpmp-upstream/" &
+        " -I" & nimLibDir &
+        " -I" & bearSslPkgDir & "/bearssl/csources/inc/" &
+        " -I" & bearSslPkgDir & "/bearssl/csources/tools/" &
+        " -I" & bearSslPkgDir & "/bearssl/abi/" &
+        " -I" & secp256k1PkgDir & "/vendor/secp256k1/include/" &
+        " -I" & natTraversalPkgDir & "/vendor/miniupnp/miniupnpc/include/" &
+        " -I" & natTraversalPkgDir & "/vendor/libnatpmp-upstream/" &
         " -I" & nimcacheDir &
         " -c " & cFile &
         " -o " & oFile

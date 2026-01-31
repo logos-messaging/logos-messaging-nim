@@ -9,12 +9,6 @@ if defined(windows):
   switch("passL", "rln.lib")
   switch("define", "postgres=false")
 
-  # Automatically add all vendor subdirectories
-  for dir in walkDir("./vendor"):
-    if dir.kind == pcDir:
-      switch("path", dir.path)
-      switch("path", dir.path / "src")
-
   # disable timestamps in Windows PE headers - https://wiki.debian.org/ReproducibleBuilds/TimestampsInPEBinaries
   switch("passL", "-Wl,--no-insert-timestamp")
   # increase stack size
@@ -97,7 +91,7 @@ if not defined(macosx) and not defined(android):
     # light-weight stack traces using libbacktrace and libunwind
     --define:
       nimStackTraceOverride
-    switch("import", "libbacktrace")
+    # Note: libbacktrace import moved to after nimble paths are loaded (see below)
 
 --define:
   nimOldCaseObjects
@@ -125,3 +119,13 @@ if defined(android):
   switch("passC", "--sysroot=" & sysRoot)
   switch("passL", "--sysroot=" & sysRoot)
   switch("cincludes", sysRoot & "/usr/include/")
+# begin Nimble config (version 2)
+--noNimblePath
+when withDir(thisDir(), system.fileExists("nimble.paths")):
+  include "nimble.paths"
+# end Nimble config
+
+# Import libbacktrace for stack traces (must be after nimble paths are loaded)
+if not defined(macosx) and not defined(android):
+  if not (defined(windows) and defined(i386)) and not defined(disable_libbacktrace):
+    switch("import", "libbacktrace")

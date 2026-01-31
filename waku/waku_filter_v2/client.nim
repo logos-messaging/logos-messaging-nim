@@ -10,8 +10,9 @@ import
   bearssl/rand,
   stew/byteutils
 import
-  waku/
-    [node/peer_manager, waku_core, events/delivery_events, common/broker/broker_context],
+  waku /
+    [node/peer_manager, waku_core, events/delivery_events,
+        common/broker/broker_context],
   ./common,
   ./protocol_metrics,
   ./rpc_codec,
@@ -29,7 +30,7 @@ type WakuFilterClient* = ref object of LPProtocol
 func generateRequestId(rng: ref HmacDrbgContext): string =
   var bytes: array[10, byte]
   hmacDrbgGenerate(rng[], bytes)
-  return toHex(bytes)
+  return byteutils.toHex(bytes)
 
 proc sendSubscribeRequest(
     wfc: WakuFilterClient,
@@ -62,7 +63,8 @@ proc sendSubscribeRequest(
   except CatchableError:
     let errMsg =
       "exception in waku_filter_v2 client writeLP: " & getCurrentExceptionMsg()
-    trace "exception in waku_filter_v2 client writeLP", error = getCurrentExceptionMsg()
+    trace "exception in waku_filter_v2 client writeLP",
+        error = getCurrentExceptionMsg()
     waku_filter_errors.inc(labelValues = [errMsg])
     return err(FilterSubscribeError.badResponse(errMsg))
 
@@ -72,7 +74,8 @@ proc sendSubscribeRequest(
   except CatchableError:
     let errMsg =
       "exception in waku_filter_v2 client readLp: " & getCurrentExceptionMsg()
-    trace "exception in waku_filter_v2 client readLp", error = getCurrentExceptionMsg()
+    trace "exception in waku_filter_v2 client readLp",
+        error = getCurrentExceptionMsg()
     waku_filter_errors.inc(labelValues = [errMsg])
     return err(FilterSubscribeError.badResponse(errMsg))
 
@@ -123,7 +126,8 @@ proc subscribe*(
 
   let requestId = generateRequestId(wfc.rng)
   let filterSubscribeRequest = FilterSubscribeRequest.subscribe(
-    requestId = requestId, pubsubTopic = pubsubTopic, contentTopics = contentTopicSeq
+    requestId = requestId, pubsubTopic = pubsubTopic,
+    contentTopics = contentTopicSeq
   )
 
   ?await wfc.sendSubscribeRequest(servicePeer, filterSubscribeRequest)
@@ -146,7 +150,8 @@ proc unsubscribe*(
 
   let requestId = generateRequestId(wfc.rng)
   let filterSubscribeRequest = FilterSubscribeRequest.unsubscribe(
-    requestId = requestId, pubsubTopic = pubsubTopic, contentTopics = contentTopicSeq
+    requestId = requestId, pubsubTopic = pubsubTopic,
+    contentTopics = contentTopicSeq
   )
 
   ?await wfc.sendSubscribeRequest(servicePeer, filterSubscribeRequest)
@@ -168,7 +173,8 @@ proc registerPushHandler*(wfc: WakuFilterClient, handler: FilterPushHandler) =
   wfc.pushHandlers.add(handler)
 
 proc initProtocolHandler(wfc: WakuFilterClient) =
-  proc handler(conn: Connection, proto: string) {.async: (raises: [CancelledError]).} =
+  proc handler(conn: Connection, proto: string) {.async: (raises: [
+      CancelledError]).} =
     ## Notice that the client component is acting as a server of WakuFilterPushCodec messages
     while not conn.atEof():
       var buf: seq[byte]

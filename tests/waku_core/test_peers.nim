@@ -1,12 +1,13 @@
 {.used.}
 
 import
+  std/options,
+  std/net,
   results,
   testutils/unittests,
   libp2p/multiaddress,
   libp2p/peerid,
-  libp2p/errors,
-  confutils/toml/std/net
+  libp2p/errors
 import waku/[waku_core, waku_enr], ../testlib/wakucore
 
 suite "Waku Core - Peers":
@@ -155,9 +156,9 @@ suite "Waku Core - Peers":
     ## When
     var builder = EnrBuilder.init(enrPrivKey, seqNum = enrSeqNum)
     builder.withIpAddressAndPorts(
-      ipAddr = some(parseIpAddress("127.0.0.1")),
-      tcpPort = some(Port(0)),
-      udpPort = some(Port(0)),
+      ipAddr = options.some(parseIpAddress("127.0.0.1")),
+      tcpPort = options.some(Port(0)),
+      udpPort = options.some(Port(0)),
     )
     builder.withWakuCapabilities(Capabilities.Relay, Capabilities.Store)
 

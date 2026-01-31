@@ -6,6 +6,10 @@
 # Nimble packages
 /vendor/.nimble
 
+# Developer vendor repos (cloned on-demand via `make vendors`)
+/vendor/zerokit/
+/vendor/waku-rlnv2-contract/
+
 # Generated Files
 *.generated.nim
 

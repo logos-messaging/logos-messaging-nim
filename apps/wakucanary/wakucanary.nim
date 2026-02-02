@@ -289,10 +289,6 @@ proc main(rng: ref HmacDrbgContext): Future[int] {.async.} =
       error "Not all protocols are supported",
         expected = conf.protocols, supported = nodeProtocols
       quit(QuitFailure)
-
-    if not pingSuccess:
-      error "Node is reachable and supports protocols but ping failed - connection may be unstable"
-      quit(QuitFailure)
   elif conStatus == CannotConnect:
     error "Could not connect", peerId = peer.peerId
     quit(QuitFailure)

@@ -32,7 +32,7 @@ proc new*(
   )
 
 proc isTopicHealthy(self: RelaySendProcessor, topic: PubsubTopic): bool {.gcsafe.} =
-  let healthReport = RequestRelayTopicsHealth.request(self.brokerCtx, @[topic]).valueOr:
+  let healthReport = RequestTopicsHealth.request(self.brokerCtx, @[topic]).valueOr:
     error "isTopicHealthy: failed to get health report", topic = topic, error = error
     return false
 

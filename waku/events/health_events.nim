@@ -10,8 +10,7 @@ EventBroker:
   type EventConnectionStatusChange* = object
     connectionStatus*: ConnectionStatus
 
-# TODO: content topic vs pubsub topic
 EventBroker:
-  type EventRelayTopicHealthChange* = object
+  type EventTopicHealthChange* = object
     topic*: PubsubTopic
     health*: TopicHealth

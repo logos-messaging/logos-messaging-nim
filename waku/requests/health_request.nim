@@ -11,12 +11,11 @@ RequestBroker(sync):
   type RequestConnectionStatus* = object
     connectionStatus*: ConnectionStatus
 
-# TODO: content topic vs pubsub topic
 RequestBroker(sync):
-  type RequestRelayTopicsHealth* = object
+  type RequestTopicsHealth* = object
     topicHealth*: seq[tuple[topic: PubsubTopic, health: TopicHealth]]
 
-  proc signature(topics: seq[PubsubTopic]): Result[RequestRelayTopicsHealth, string]
+  proc signature(topics: seq[PubsubTopic]): Result[RequestTopicsHealth, string]
 
 RequestBroker:
   type RequestProtocolHealth* = object

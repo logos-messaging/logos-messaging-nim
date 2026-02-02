@@ -18,6 +18,7 @@ import
   ../../common/broker/broker_context,
   ../../events/peer_events,
   ../../waku_core,
+  ../../waku_core/topics/sharding,
   ../../waku_relay,
   ../../waku_relay/protocol,
   ../../waku_enr/sharding,
@@ -26,6 +27,8 @@ import
   ../health_monitor/online_monitor,
   ./peer_store/peer_storage,
   ./waku_peer_store
+
+import std/[algorithm, sequtils] # metadata update delta calc
 
 export waku_peer_store, peer_storage, peers
 
@@ -503,6 +506,24 @@ proc connectedPeers*(
 
   return (inPeers, outPeers)
 
+proc getPeersForShard*(pm: PeerManager, protocolId: string, shard: PubsubTopic): int =
+  let (inPeers, outPeers) = pm.connectedPeers(protocolId)
+  let connectedProtocolPeers = inPeers & outPeers
+  if connectedProtocolPeers.len == 0:
+    return 0
+
+  let shardInfo = RelayShard.parse(shard).valueOr:
+    # count raw peers of the given protocol if for some reason we can't get
+    # a shard mapping out of the gossipsub topic string.
+    return connectedProtocolPeers.len
+
+  var shardPeers = 0
+  for peerId in connectedProtocolPeers:
+    if pm.switch.peerStore.hasShard(peerId, shardInfo.clusterId, shardInfo.shardId):
+      shardPeers.inc()
+
+  return shardPeers
+
 proc disconnectAllPeers*(pm: PeerManager) {.async.} =
   let (inPeerIds, outPeerIds) = pm.connectedPeers()
   let connectedPeers = concat(inPeerIds, outPeerIds)
@@ -638,7 +659,7 @@ proc getPeerIp(pm: PeerManager, peerId: PeerId): Option[string] =
 # Event Handling  #
 #~~~~~~~~~~~~~~~~~#
 
-proc onPeerMetadata(pm: PeerManager, peerId: PeerId) {.async.} =
+proc refreshPeerMetadata(pm: PeerManager, peerId: PeerId) {.async.} =
   let res = catch:
     await pm.switch.dial(peerId, WakuMetadataCodec)
 
@@ -667,6 +688,10 @@ proc onPeerMetadata(pm: PeerManager, peerId: PeerId) {.async.} =
       let shards = metadata.shards.mapIt(it.uint16)
       pm.switch.peerStore.setShardInfo(peerId, shards)
 
+    # TODO: should only trigger an event if metadata actually changed
+    #       should include the shard subscription delta in the event when
+    #         it is a MetadataUpdated event
+    EventWakuPeer.emit(pm.brokerCtx, peerId, WakuPeerEventKind.MetadataUpdated)
     return
 
   info "disconnecting from peer", peerId = peerId, reason = reason
@@ -676,14 +701,14 @@ proc onPeerMetadata(pm: PeerManager, peerId: PeerId) {.async.} =
 # called when a peer i) first connects to us ii) disconnects all connections from us
 proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
   if not pm.wakuMetadata.isNil() and event.kind == PeerEventKind.Joined:
-    await pm.onPeerMetadata(peerId)
+    await pm.refreshPeerMetadata(peerId)
 
   var peerStore = pm.switch.peerStore
   var direction: PeerDirection
   var connectedness: Connectedness
 
   case event.kind
-  of Joined:
+  of PeerEventKind.Joined:
     direction = if event.initiator: Outbound else: Inbound
     connectedness = Connected
 
@@ -711,12 +736,12 @@ proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
           asyncSpawn(pm.switch.disconnect(peerId))
           peerStore.delete(peerId)
 
-    EventWakuPeer.emit(pm.brokerCtx, peerId, Joined)
+    EventWakuPeer.emit(pm.brokerCtx, peerId, WakuPeerEventKind.Connected)
 
     if not pm.onConnectionChange.isNil():
       # we don't want to await for the callback to finish
       asyncSpawn pm.onConnectionChange(peerId, Joined)
-  of Left:
+  of PeerEventKind.Left:
     direction = UnknownDirection
     connectedness = CanConnect
 
@@ -728,15 +753,15 @@ proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
           pm.ipTable.del(ip)
         break
 
-    EventWakuPeer.emit(pm.brokerCtx, peerId, Left)
+    EventWakuPeer.emit(pm.brokerCtx, peerId, WakuPeerEventKind.Disconnected)
 
     if not pm.onConnectionChange.isNil():
       # we don't want to await for the callback to finish
       asyncSpawn pm.onConnectionChange(peerId, Left)
-  of Identified:
+  of PeerEventKind.Identified:
     info "event identified", peerId = peerId
 
-    EventWakuPeer.emit(pm.brokerCtx, peerId, Identified)
+    EventWakuPeer.emit(pm.brokerCtx, peerId, WakuPeerEventKind.Identified)
 
   peerStore[ConnectionBook][peerId] = connectedness
   peerStore[DirectionBook][peerId] = direction

@@ -349,18 +349,6 @@ proc initRelayObservers(w: WakuRelay) =
 
   w.addObserver(administrativeObserver)
 
-proc initRequestProviders(w: WakuRelay) =
-  RequestRelayTopicsHealth.setProvider(
-    w.brokerCtx,
-    proc(topics: seq[PubsubTopic]): Result[RequestRelayTopicsHealth, string] =
-      var collectedRes: RequestRelayTopicsHealth
-      for topic in topics:
-        let health = w.topicsHealth.getOrDefault(topic, TopicHealth.NOT_SUBSCRIBED)
-        collectedRes.topicHealth.add((topic, health))
-      return ok(collectedRes),
-  ).isOkOr:
-    error "Cannot set Relay Topics Health request provider", error = error
-
 proc new*(
     T: type WakuRelay,
     switch: Switch,
@@ -390,12 +378,11 @@ proc new*(
     w.topicHealthCheckAll = false
     w.initProtocolHandler()
     w.initRelayObservers()
-    w.initRequestProviders()
 
     w.peerEventListener = EventWakuPeer.listen(
       w.brokerCtx,
       proc(evt: EventWakuPeer): Future[void] {.async: (raises: []), gcsafe.} =
-        if evt.kind == PeerEventKind.Left:
+        if evt.kind == WakuPeerEventKind.Disconnected:
           w.topicHealthCheckAll = true
           w.topicHealthUpdateEvent.fire()
       ,
@@ -515,7 +502,7 @@ proc topicsHealthLoop(w: WakuRelay) {.async.} =
 
       w.topicsHealth[topic] = currentHealth
 
-      EventRelayTopicHealthChange.emit(w.brokerCtx, topic, currentHealth)
+      EventTopicHealthChange.emit(w.brokerCtx, topic, currentHealth)
 
       if not w.onTopicHealthChange.isNil():
         futs.add(w.onTopicHealthChange(topic, currentHealth))

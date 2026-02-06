@@ -51,15 +51,16 @@ procSuite "WakuNode - Store":
   let kvs = zip(hashes, msgListA).mapIt(
       WakuMessageKeyValue(
         messageHash: it[0], message: some(it[1]), pubsubTopic: some(DefaultPubsubTopic)
-      )
     )
+  )
 
   let archiveA = block:
     let driver = newSqliteArchiveDriver()
 
     for kv in kvs:
       let message = kv.message.get()
-      require (waitFor driver.put(kv.messageHash, DefaultPubsubTopic, message)).isOk()
+      require (waitFor driver.put(kv.messageHash, DefaultPubsubTopic,
+          message)).isOk()
 
     driver
 
@@ -305,7 +306,8 @@ procSuite "WakuNode - Store":
 
     ## Forcing a bad cursor with empty digest data
     var cursor: WakuMessageHash = [
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0,
       0, 0, 0, 0, 0,
     ]
 
@@ -386,7 +388,7 @@ procSuite "WakuNode - Store":
     let mountArchiveRes = server.mountArchive(archiveA)
     assert mountArchiveRes.isOk(), mountArchiveRes.error
 
-    waitFor server.mountStore((3, 500.millis))
+    waitFor server.mountStore((3, 200.millis))
 
     client.mountStoreClient()
 
@@ -413,11 +415,11 @@ procSuite "WakuNode - Store":
 
     for count in 0 ..< 3:
       waitFor successProc()
-      waitFor sleepAsync(5.millis)
+      waitFor sleepAsync(1.millis)
 
     waitFor failsProc()
 
-    waitFor sleepAsync(500.millis)
+    waitFor sleepAsync(200.millis)
 
     for count in 0 ..< 3:
       waitFor successProc()

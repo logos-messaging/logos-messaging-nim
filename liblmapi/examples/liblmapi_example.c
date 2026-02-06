@@ -104,11 +104,12 @@ int main() {
 
     // Configuration JSON for creating a node
     const char *config = "{"
-        "\"mode\": \"Core\","
-        "\"clusterId\": 16,"
-        "\"numShards\": 5,"
-        "\"shards\": [64, 128, 1, 32, 256],"
-        "\"entryNodes\": [\"/dns4/boot-01.gc-us-central1-a.status.prod.status.im/tcp/30303/p2p/16Uiu2HAm8mUZ18tBWPXDQsaF7PbCKYA35z7WB2xNZH2EVq1qS8LJ\"],"
+        "\"logLevel\": \"TRACE\","
+        "\"mode\": \"Edge\","
+        "\"clusterId\": 42,"
+        "\"numShards\": 8,"
+        // "\"shards\": [0,1,2,3,4,5,6,7],"
+        "\"entryNodes\": [\"/dns4/node-01.do-ams3.misc.logos-chat.status.im/tcp/30303/p2p/16Uiu2HAkxoqUTud5LUPQBRmkeL2xP4iKx2kaABYXomQRgmLUgf78\"],"
         "\"networkingConfig\": {"
             "\"listenIpv4\": \"0.0.0.0\","
             "\"p2pTcpPort\": 60000,"

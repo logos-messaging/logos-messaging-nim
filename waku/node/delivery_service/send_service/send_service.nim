@@ -91,6 +91,7 @@ proc setupSendProcessorChain(
   for i in 1 ..< processors.len:
     currentProcessor.chain(processors[i])
     currentProcessor = processors[i]
+    trace "Send processor chain", index = i, processor = type(processors[i]).name
 
   return ok(processors[0])
 

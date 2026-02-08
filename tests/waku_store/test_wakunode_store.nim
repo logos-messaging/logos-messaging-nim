@@ -51,16 +51,15 @@ procSuite "WakuNode - Store":
   let kvs = zip(hashes, msgListA).mapIt(
       WakuMessageKeyValue(
         messageHash: it[0], message: some(it[1]), pubsubTopic: some(DefaultPubsubTopic)
+      )
     )
-  )
 
   let archiveA = block:
     let driver = newSqliteArchiveDriver()
 
     for kv in kvs:
       let message = kv.message.get()
-      require (waitFor driver.put(kv.messageHash, DefaultPubsubTopic,
-          message)).isOk()
+      require (waitFor driver.put(kv.messageHash, DefaultPubsubTopic, message)).isOk()
 
     driver
 
@@ -306,8 +305,7 @@ procSuite "WakuNode - Store":
 
     ## Forcing a bad cursor with empty digest data
     var cursor: WakuMessageHash = [
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       0, 0, 0, 0, 0,
     ]
 

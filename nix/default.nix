@@ -91,8 +91,11 @@ in stdenv.mkDerivation {
   '' else ''
     mkdir -p $out/bin $out/include
 
-    # Copy library files
-    cp build/* $out/bin/ 2>/dev/null || true
+    # Copy library files from build directory (created by Make during buildPhase)
+    # Note: build/ is in the source tree, not result/ (which is a post-build symlink)
+    if [ -d build ]; then
+      cp build/lib*.{so,dylib,dll,a} $out/bin/ 2>/dev/null || true
+    fi
 
     # Copy header files
     cp library/libwaku.h $out/include/ 2>/dev/null || true

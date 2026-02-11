@@ -1320,6 +1320,8 @@ procSuite "Peer Manager":
     for peerInfo in peerInfos:
       pm.switch.peerStore[AddressBook][peerInfo.peerId] = peerInfo.addrs
       pm.switch.peerStore[ProtoBook][peerInfo.peerId] = @[WakuRelayCodec]
+      # simulate metadata exchange by setting shards field in peerstore
+      pm.switch.peerStore.setShardInfo(peerInfo.peerId, peerInfo.shards)
 
     ## When: We select a peer for shard 0
     let shard0Topic = some(PubsubTopic("/waku/2/rs/0/0"))
@@ -1413,6 +1415,8 @@ procSuite "Peer Manager":
 
     node.peerManager.addPeer(peerInfo)
     node.peerManager.switch.peerStore[ProtoBook][peerInfo.peerId] = @[WakuRelayCodec]
+    # simulate metadata exchange by setting shards field in peerstore
+    node.peerManager.switch.peerStore.setShardInfo(peerInfo.peerId, peerInfo.shards)
 
     ## When: We select for shard 0
     let shard0Topic = some(PubsubTopic("/waku/2/rs/0/0"))

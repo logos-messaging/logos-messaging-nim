@@ -406,8 +406,4 @@ proc new*(
   let om = OnlineMonitor.init(dnsNameServers)
   om.setPeerStoreToOnlineMonitor(node.switch.peerStore)
   om.addOnlineStateObserver(node.peerManager.getOnlineStateObserver())
-  T(
-    nodeHealth: INITIALIZING,
-    node: node,
-    onlineMonitor: om,
-  )
+  T(nodeHealth: INITIALIZING, node: node, onlineMonitor: om)

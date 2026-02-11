@@ -93,7 +93,7 @@ proc buildMobileAndroid(srcDir = ".", params = "") =
     extra_params &= " " & paramStr(i)
 
   exec "nim c" & " --out:" & outDir &
-    "/libwaku.so --threads:on --app:lib --opt:size --noMain --mm:refc -d:chronicles_sinks=textlines[dynamic] --header --passL:-L" &
+    "/libwaku.so --threads:on --app:lib --opt:size --noMain --mm:refc -d:chronicles_sinks=textlines[dynamic] --header -d:chronosEventEngine=epoll --passL:-L" &
     outdir & " --passL:-lrln --passL:-llog --cpu:" & cpu & " --os:android -d:androidNDK " &
     extra_params & " " & srcDir & "/libwaku.nim"
 
@@ -136,7 +136,7 @@ task testwakunode2, "Build & run wakunode2 app tests":
   test "all_tests_wakunode2"
 
 task example2, "Build Waku examples":
-  buildBinary "waku_example", "examples/"
+  buildBinary "api_example", "examples/api_example/"
   buildBinary "publisher", "examples/"
   buildBinary "subscriber", "examples/"
   buildBinary "filter_subscriber", "examples/"
@@ -175,6 +175,10 @@ task liteprotocoltester, "Build liteprotocoltester":
 task lightpushwithmix, "Build lightpushwithmix":
   let name = "lightpush_publisher_mix"
   buildBinary name, "examples/lightpush_mix/"
+
+task api_example, "Build api_example":
+  let name = "api_example"
+  buildBinary name, "examples/api_example/"
 
 task buildone, "Build custom target":
   let filepath = paramStr(paramCount())

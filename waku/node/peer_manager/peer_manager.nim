@@ -226,7 +226,7 @@ proc selectPeer*(
     let shardInfo = RelayShard.parse(shard.get()).valueOr:
       trace "Failed to parse shard from pubsub topic", topic = shard.get()
       return none(RemotePeerInfo)
-    
+
     # Filter peers that support the requested shard
     # Check both ENR (if present) and the shards field on RemotePeerInfo
     peers.keepItIf(

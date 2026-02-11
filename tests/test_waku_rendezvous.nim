@@ -117,10 +117,11 @@ procSuite "Waku Rendezvous":
     ## Given: A light client node with no relay protocol
     let
       clusterId = 10.uint16
-      configuredShards = @[
-        RelayShard(clusterId: clusterId, shardId: 0),
-        RelayShard(clusterId: clusterId, shardId: 1),
-      ]
+      configuredShards =
+        @[
+          RelayShard(clusterId: clusterId, shardId: 0),
+          RelayShard(clusterId: clusterId, shardId: 1),
+        ]
 
     let lightClient = newTestWakuNode(
       generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0), clusterId = clusterId

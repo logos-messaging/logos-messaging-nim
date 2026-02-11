@@ -159,13 +159,13 @@ proc getShardsGetter(node: WakuNode, configuredShards: seq[uint16]): GetShards =
     if node.wakuRelay.isNil():
       # If relay is not mounted, return configured shards
       return configuredShards
-    
+
     let subscribedTopics = node.wakuRelay.subscribedTopics()
-    
+
     # If relay hasn't subscribed to any topics yet, return configured shards
     if subscribedTopics.len == 0:
       return configuredShards
-    
+
     let relayShards = topicsToRelayShards(subscribedTopics).valueOr:
       error "could not convert relay topics to shards",
         error = $error, topics = subscribedTopics
@@ -407,11 +407,13 @@ proc mountRendezvousClient*(node: WakuNode, clusterId: uint16) {.async: (raises:
   if node.started:
     await node.wakuRendezvousClient.start()
 
-proc mountRendezvous*(node: WakuNode, clusterId: uint16, shards: seq[RelayShard] = @[]) {.async: (raises: []).} =
+proc mountRendezvous*(
+    node: WakuNode, clusterId: uint16, shards: seq[RelayShard] = @[]
+) {.async: (raises: []).} =
   info "mounting rendezvous discovery protocol"
 
   let configuredShards = shards.mapIt(it.shardId)
-  
+
   node.wakuRendezvous = WakuRendezVous.new(
     node.switch,
     node.peerManager,

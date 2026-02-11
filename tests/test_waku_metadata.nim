@@ -79,10 +79,7 @@ procSuite "Waku Metadata Protocol":
       subscribeShards = configuredShards,
     )
     let node2 = newTestWakuNode(
-      generateSecp256k1Key(),
-      parseIpAddress("0.0.0.0"),
-      Port(0),
-      clusterId = clusterId,
+      generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0), clusterId = clusterId
     )
 
     # Mount metadata with configured shards on node1

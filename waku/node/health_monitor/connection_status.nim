@@ -2,7 +2,9 @@ import chronos, results, std/strutils, ../../api/types
 
 export ConnectionStatus
 
-proc init*(t: typedesc[ConnectionStatus], strRep: string): Result[ConnectionStatus, string] =
+proc init*(
+    t: typedesc[ConnectionStatus], strRep: string
+): Result[ConnectionStatus, string] =
   try:
     let status = parseEnum[ConnectionStatus](strRep)
     return ok(status)

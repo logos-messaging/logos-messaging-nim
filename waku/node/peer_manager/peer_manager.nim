@@ -530,8 +530,10 @@ proc getConnectedPeersCount*(pm: PeerManager, protocol: string): int =
   ## with active streams for a specific protocol.
   let (inPeers, outPeers) = pm.connectedPeers(protocol)
   var peers = initHashSet[PeerId](nextPowerOfTwo(inPeers.len + outPeers.len))
-  for p in inPeers: peers.incl(p)
-  for p in outPeers: peers.incl(p)
+  for p in inPeers:
+    peers.incl(p)
+  for p in outPeers:
+    peers.incl(p)
   return peers.len
 
 proc getCapablePeersCount*(pm: PeerManager, protocol: string): int =
@@ -539,8 +541,10 @@ proc getCapablePeersCount*(pm: PeerManager, protocol: string): int =
   ## who have identified themselves as supporting the given protocol.
   let (inPeers, outPeers) = pm.capablePeers(protocol)
   var peers = initHashSet[PeerId](nextPowerOfTwo(inPeers.len + outPeers.len))
-  for p in inPeers: peers.incl(p)
-  for p in outPeers: peers.incl(p)
+  for p in inPeers:
+    peers.incl(p)
+  for p in outPeers:
+    peers.incl(p)
   return peers.len
 
 proc getPeersForShard*(pm: PeerManager, protocolId: string, shard: PubsubTopic): int =

@@ -118,11 +118,7 @@ proc validate(
 
 proc createApiNodeConf(mode: WakuMode = WakuMode.Core): NodeConfig =
   # allocate random ports to avoid port-already-in-use errors
-  let netConf = NetworkingConfig(
-    listenIpv4: "0.0.0.0",
-    p2pTcpPort: 0,
-    discv5UdpPort: 0
-  )
+  let netConf = NetworkingConfig(listenIpv4: "0.0.0.0", p2pTcpPort: 0, discv5UdpPort: 0)
 
   result = NodeConfig.init(
     mode = mode,

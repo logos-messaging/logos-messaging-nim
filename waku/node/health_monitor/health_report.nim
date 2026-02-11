@@ -1,9 +1,6 @@
 {.push raises: [].}
 
-import
-  ./health_status,
-  ./connection_status,
-  ./protocol_health
+import ./health_status, ./connection_status, ./protocol_health
 
 type HealthReport* = object
   ## Rest API type returned for /health endpoint

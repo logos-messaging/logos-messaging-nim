@@ -484,12 +484,10 @@ proc updateAnnouncedAddrWithPrimaryIpAddr*(node: WakuNode): Result[void, string]
   return ok()
 
 proc calculateEdgeTopicHealth(node: WakuNode, shard: PubsubTopic): TopicHealth =
-  let filterPeers = node.peerManager.getPeersForShard(
-    filter_common.WakuFilterSubscribeCodec, shard
-  )
-  let lightpushPeers = node.peerManager.getPeersForShard(
-    lightpush_protocol.WakuLightPushCodec, shard
-  )
+  let filterPeers =
+    node.peerManager.getPeersForShard(filter_common.WakuFilterSubscribeCodec, shard)
+  let lightpushPeers =
+    node.peerManager.getPeersForShard(lightpush_protocol.WakuLightPushCodec, shard)
 
   if filterPeers >= EdgeTopicHealthyThreshold and
       lightpushPeers >= EdgeTopicHealthyThreshold:
@@ -548,16 +546,15 @@ proc startProvidersAndListeners*(node: WakuNode) =
         var healthStatus = TopicHealth.UNHEALTHY
 
         if not node.wakuRelay.isNil:
-          healthStatus = node.wakuRelay.topicsHealth.getOrDefault(
-            shard, TopicHealth.NOT_SUBSCRIBED
-          )
+          healthStatus =
+            node.wakuRelay.topicsHealth.getOrDefault(shard, TopicHealth.NOT_SUBSCRIBED)
 
         if healthStatus == TopicHealth.NOT_SUBSCRIBED:
           healthStatus = node.calculateEdgeTopicHealth(shard)
 
         response.topicHealth.add((shard, healthStatus))
 
-      return ok(response)
+      return ok(response),
   ).isOkOr:
     error "Can't set provider for RequestShardTopicsHealth", error = error
 
@@ -585,7 +582,7 @@ proc startProvidersAndListeners*(node: WakuNode) =
 
         response.contentTopicHealth.add((topic: contentTopic, health: topicHealth))
 
-      return ok(response)
+      return ok(response),
   ).isOkOr:
     error "Can't set provider for RequestContentTopicsHealth", error = error
 
@@ -594,7 +591,6 @@ proc stopProvidersAndListeners*(node: WakuNode) =
   RequestRelayShard.clearProvider(node.brokerCtx)
   RequestContentTopicsHealth.clearProvider(node.brokerCtx)
   RequestShardTopicsHealth.clearProvider(node.brokerCtx)
-
 
 proc start*(node: WakuNode) {.async.} =
   ## Starts a created Waku Node and

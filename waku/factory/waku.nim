@@ -44,7 +44,7 @@ import
     requests/health_requests,
     factory/node_factory,
     factory/internal_config,
-    factory/app_callbacks
+    factory/app_callbacks,
   ],
   ./waku_conf
 
@@ -165,7 +165,8 @@ proc setupAppCallbacks(
 
   if not appCallbacks.connectionStatusChangeHandler.isNil():
     if healthMonitor.isNil():
-      return err("Cannot configure connectionStatusChangeHandler with empty health monitor")
+      return
+        err("Cannot configure connectionStatusChangeHandler with empty health monitor")
 
     healthMonitor.onConnectionStatusChange = appCallbacks.connectionStatusChangeHandler
 
@@ -426,7 +427,8 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
     proc(): Result[RequestConnectionStatus, string] =
       try:
         let healthReport = waku[].healthMonitor.getSyncNodeHealthReport()
-        return ok(RequestConnectionStatus(connectionStatus: healthReport.connectionStatus))
+        return
+          ok(RequestConnectionStatus(connectionStatus: healthReport.connectionStatus))
       except CatchableError:
         err("Failed to read health report: " & getCurrentExceptionMsg()),
   ).isOkOr:

@@ -157,7 +157,7 @@ suite "LM API health checking":
         raiseAssert "RequestConnectionStatus failed"
 
       if req.connectionStatus == ConnectionStatus.PartiallyConnected or
-         req.connectionStatus == ConnectionStatus.Connected:
+          req.connectionStatus == ConnectionStatus.Connected:
         isConnected = true
         break
       await sleepAsync(chronos.milliseconds(100))

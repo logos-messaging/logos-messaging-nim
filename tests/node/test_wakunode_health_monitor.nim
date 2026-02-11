@@ -43,32 +43,23 @@ suite "Health Monitor - health state calculation":
         protoHealthMock(LightpushClientProtocol, HealthStatus.NOT_READY),
       ]
     let strength = initTable[WakuProtocol, int]()
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     check state == ConnectionStatus.Disconnected
 
   test "PartiallyConnected, weak relay":
     let weakCount = MockDLow - 1
-    let protocols =
-      @[
-        protoHealthMock(RelayProtocol, HealthStatus.READY),
-      ]
+    let protocols = @[protoHealthMock(RelayProtocol, HealthStatus.READY)]
     var strength = initTable[WakuProtocol, int]()
     strength[RelayProtocol] = weakCount
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     # Partially connected since relay connectivity is weak (> 0, but < dLow)
     check state == ConnectionStatus.PartiallyConnected
 
   test "Connected, robust relay":
-    let protocols =
-      @[
-        protoHealthMock(RelayProtocol, HealthStatus.READY),
-      ]
+    let protocols = @[protoHealthMock(RelayProtocol, HealthStatus.READY)]
     var strength = initTable[WakuProtocol, int]()
     strength[RelayProtocol] = MockDLow
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     # Fully connected since relay connectivity is ideal (>= dLow)
     check state == ConnectionStatus.Connected
 
@@ -84,8 +75,7 @@ suite "Health Monitor - health state calculation":
     strength[LightpushClientProtocol] = HealthyThreshold
     strength[FilterClientProtocol] = HealthyThreshold
     strength[StoreClientProtocol] = HealthyThreshold
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     check state == ConnectionStatus.Connected
 
   test "Disconnected, edge missing store":
@@ -99,8 +89,7 @@ suite "Health Monitor - health state calculation":
     strength[LightpushClientProtocol] = HealthyThreshold
     strength[FilterClientProtocol] = HealthyThreshold
     strength[StoreClientProtocol] = 0
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     check state == ConnectionStatus.Disconnected
 
   test "PartiallyConnected, edge meets minimum failover requirement":
@@ -115,8 +104,7 @@ suite "Health Monitor - health state calculation":
     strength[LightpushClientProtocol] = weakCount
     strength[FilterClientProtocol] = weakCount
     strength[StoreClientProtocol] = weakCount
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     check state == ConnectionStatus.PartiallyConnected
 
   test "Connected, robust relay ignores store server":
@@ -128,8 +116,7 @@ suite "Health Monitor - health state calculation":
     var strength = initTable[WakuProtocol, int]()
     strength[RelayProtocol] = MockDLow
     strength[StoreProtocol] = 0
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     check state == ConnectionStatus.Connected
 
   test "Connected, robust relay ignores store client":
@@ -143,8 +130,7 @@ suite "Health Monitor - health state calculation":
     strength[RelayProtocol] = MockDLow
     strength[StoreProtocol] = 0
     strength[StoreClientProtocol] = 0
-    let state =
-      calculateConnectionState(protocols, strength, some(MockDLow))
+    let state = calculateConnectionState(protocols, strength, some(MockDLow))
     check state == ConnectionStatus.Connected
 
 suite "Health Monitor - events":

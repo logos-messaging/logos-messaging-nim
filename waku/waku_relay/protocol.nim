@@ -352,7 +352,6 @@ proc initRelayObservers(w: WakuRelay) =
 proc new*(
     T: type WakuRelay,
     switch: Switch,
-    brokerCtx: BrokerContext = globalBrokerContext(),
     maxMessageSize = int(DefaultMaxWakuMessageSize),
 ): WakuRelayResult[T] =
   ## maxMessageSize: max num bytes that are allowed for the WakuMessage
@@ -369,7 +368,7 @@ proc new*(
       maxMessageSize = maxMessageSize,
       parameters = GossipsubParameters,
     )
-    w.brokerCtx = brokerCtx
+    w.brokerCtx = globalBrokerContext()
 
     procCall GossipSub(w).initPubSub()
     w.topicsHealth = initTable[string, TopicHealth]()

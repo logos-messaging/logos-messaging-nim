@@ -88,8 +88,8 @@ type ConnectionChangeHandler* = proc(
 ): Future[void] {.gcsafe, raises: [Defect].}
 
 type PeerManager* = ref object of RootObj
-  switch*: Switch
   brokerCtx: BrokerContext
+  switch*: Switch
   wakuMetadata*: WakuMetadata
   initialBackoffInSec*: int
   backoffFactor*: int
@@ -1113,7 +1113,6 @@ proc stop*(pm: PeerManager) =
 proc new*(
     T: type PeerManager,
     switch: Switch,
-    brokerCtx: BrokerContext = globalBrokerContext(),
     wakuMetadata: WakuMetadata = nil,
     maxRelayPeers: Option[int] = none(int),
     maxServicePeers: Option[int] = none(int),
@@ -1160,6 +1159,8 @@ proc new*(
   if backoff.weeks() > 1:
     error "Max backoff time can't be over 1 week", maxBackoff = backoff
     raise newException(Defect, "Max backoff time can't be over 1 week")
+
+  let brokerCtx = globalBrokerContext()
 
   let pm = PeerManager(
     switch: switch,

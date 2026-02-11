@@ -205,7 +205,6 @@ proc build*(builder: WakuNodeBuilder): Result[WakuNode, string] =
 
   let peerManager = PeerManager.new(
     switch = switch,
-    brokerCtx = globalBrokerContext(),
     storage = builder.peerStorage.get(nil),
     maxRelayPeers = some(builder.maxRelayPeers),
     maxServicePeers = some(builder.maxServicePeers),

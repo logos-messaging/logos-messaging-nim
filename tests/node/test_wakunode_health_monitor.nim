@@ -152,8 +152,7 @@ suite "Health Monitor - events":
 
     await nodeA.start()
 
-    let monitorA = NodeHealthMonitor.new()
-    monitorA.setNodeToHealthMonitor(nodeA)
+    let monitorA = NodeHealthMonitor.new(nodeA)
 
     var
       lastStatus = ConnectionStatus.Disconnected
@@ -245,8 +244,7 @@ suite "Health Monitor - events":
 
     await nodeA.start()
 
-    let monitorA = NodeHealthMonitor.new()
-    monitorA.setNodeToHealthMonitor(nodeA)
+    let monitorA = NodeHealthMonitor.new(nodeA)
 
     var
       lastStatus = ConnectionStatus.Disconnected

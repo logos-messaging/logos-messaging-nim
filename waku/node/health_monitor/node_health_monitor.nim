@@ -56,7 +56,7 @@ func getHealth*(report: HealthReport, kind: WakuProtocol): ProtocolHealth =
   return ProtocolHealth.init(kind)
 
 proc countConnectedPeers(hm: NodeHealthMonitor, codec: string): int =
-  if isNil(hm.node) or isNil(hm.node.peerManager):
+  if isNil(hm.node.peerManager):
     return 0
 
   var peerCount = 0
@@ -64,11 +64,6 @@ proc countConnectedPeers(hm: NodeHealthMonitor, codec: string): int =
     if hm.node.peerManager.switch.isConnected(remotePeerInfo.peerId):
       peerCount.inc()
   return peerCount
-
-template checkWakuNodeNotNil(node: WakuNode, p: ProtocolHealth): untyped =
-  if isNil(node):
-    warn "WakuNode is not set, cannot check health", protocol_health_instance = $p
-    return p.notMounted()
 
 proc getRelayFailoverThreshold(hm: NodeHealthMonitor): int =
   if isNil(hm.node.wakuRelay):
@@ -79,7 +74,6 @@ proc getRelayFailoverThreshold(hm: NodeHealthMonitor): int =
 
 proc getRelayHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.RelayProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuRelay == nil:
     hm.strength[WakuProtocol.RelayProtocol] = 0
@@ -98,10 +92,6 @@ proc getRelayHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getRlnRelayHealth(hm: NodeHealthMonitor): Future[ProtocolHealth] {.async.} =
   var p = ProtocolHealth.init(WakuProtocol.RlnRelayProtocol)
-  if isNil(hm.node):
-    warn "WakuNode is not set, cannot check health", protocol_health_instance = $p
-    return p.notMounted()
-
   if isNil(hm.node.wakuRlnRelay):
     return p.notMounted()
 
@@ -126,7 +116,6 @@ proc getLightpushHealth(
     hm: NodeHealthMonitor, relayHealth: HealthStatus
 ): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.LightpushProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuLightPush == nil:
     hm.strength[WakuProtocol.LightpushProtocol] = 0
@@ -144,7 +133,6 @@ proc getLegacyLightpushHealth(
     hm: NodeHealthMonitor, relayHealth: HealthStatus
 ): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.LegacyLightpushProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuLegacyLightPush == nil:
     hm.strength[WakuProtocol.LegacyLightpushProtocol] = 0
@@ -160,7 +148,6 @@ proc getLegacyLightpushHealth(
 
 proc getFilterHealth(hm: NodeHealthMonitor, relayHealth: HealthStatus): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.FilterProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuFilter == nil:
     hm.strength[WakuProtocol.FilterProtocol] = 0
@@ -176,7 +163,6 @@ proc getFilterHealth(hm: NodeHealthMonitor, relayHealth: HealthStatus): Protocol
 
 proc getStoreHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.StoreProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuStore == nil:
     hm.strength[WakuProtocol.StoreProtocol] = 0
@@ -188,7 +174,6 @@ proc getStoreHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getLegacyStoreHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.LegacyStoreProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuLegacyStore == nil:
     hm.strength[WakuProtocol.LegacyStoreProtocol] = 0
@@ -200,7 +185,6 @@ proc getLegacyStoreHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getLightpushClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.LightpushClientProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if isNil(hm.node.wakuLightpushClient):
     hm.strength[WakuProtocol.LightpushClientProtocol] = 0
@@ -215,7 +199,6 @@ proc getLightpushClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getLegacyLightpushClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.LegacyLightpushClientProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if isNil(hm.node.wakuLegacyLightpushClient):
     hm.strength[WakuProtocol.LegacyLightpushClientProtocol] = 0
@@ -230,7 +213,7 @@ proc getLegacyLightpushClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getFilterClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.FilterClientProtocol)
-  checkWakuNodeNotNil(hm.node, p)
+
   if hm.node.wakuFilterClient == nil:
     hm.strength[WakuProtocol.FilterClientProtocol] = 0
     return p.notMounted()
@@ -244,7 +227,6 @@ proc getFilterClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getStoreClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.StoreClientProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuStoreClient == nil:
     hm.strength[WakuProtocol.StoreClientProtocol] = 0
@@ -262,7 +244,6 @@ proc getStoreClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getLegacyStoreClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.LegacyStoreClientProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuLegacyStoreClient == nil:
     hm.strength[WakuProtocol.LegacyStoreClientProtocol] = 0
@@ -280,7 +261,6 @@ proc getLegacyStoreClientHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getPeerExchangeHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.PeerExchangeProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuPeerExchange == nil:
     hm.strength[WakuProtocol.PeerExchangeProtocol] = 0
@@ -293,7 +273,6 @@ proc getPeerExchangeHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getRendezvousHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.RendezvousProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if hm.node.wakuRendezvous == nil:
     hm.strength[WakuProtocol.RendezvousProtocol] = 0
@@ -308,7 +287,6 @@ proc getRendezvousHealth(hm: NodeHealthMonitor): ProtocolHealth =
 
 proc getMixHealth(hm: NodeHealthMonitor): ProtocolHealth =
   var p = ProtocolHealth.init(WakuProtocol.MixProtocol)
-  checkWakuNodeNotNil(hm.node, p)
 
   if isNil(hm.node.wakuMix):
     return p.notMounted()
@@ -479,11 +457,6 @@ proc getNodeHealthReport*(hm: NodeHealthMonitor): Future[HealthReport] {.async.}
   ##
   var report: HealthReport
 
-  if isNil(hm.node):
-    report.nodeHealth = HealthStatus.INITIALIZING
-    report.connectionStatus = ConnectionStatus.Disconnected
-    return report
-
   if hm.nodeHealth == HealthStatus.INITIALIZING or
       hm.nodeHealth == HealthStatus.SHUTTING_DOWN:
     report.nodeHealth = hm.nodeHealth
@@ -503,11 +476,6 @@ proc getSyncNodeHealthReport*(hm: NodeHealthMonitor): HealthReport =
   ## Get a HealthReport that includes the subset of protocols that inform health synchronously
   ##
   var report: HealthReport
-
-  if isNil(hm.node):
-    report.nodeHealth = HealthStatus.INITIALIZING
-    report.connectionStatus = ConnectionStatus.Disconnected
-    return report
 
   if hm.nodeHealth == HealthStatus.INITIALIZING or
       hm.nodeHealth == HealthStatus.SHUTTING_DOWN:
@@ -706,9 +674,6 @@ proc setOverallHealth*(hm: NodeHealthMonitor, health: HealthStatus) =
 proc startHealthMonitor*(hm: NodeHealthMonitor): Result[void, string] =
   hm.onlineMonitor.startOnlineMonitor()
 
-  if isNil(hm.node):
-    return err("startHealthMonitor: no node to monitor")
-
   if isNil(hm.node.peerManager):
     return err("startHealthMonitor: no node peerManager to monitor")
 
@@ -753,12 +718,16 @@ proc stopHealthMonitor*(hm: NodeHealthMonitor) {.async.} =
 
 proc new*(
     T: type NodeHealthMonitor,
+    node: WakuNode,
     dnsNameServers = @[parseIpAddress("1.1.1.1"), parseIpAddress("1.0.0.1")],
 ): T =
+  let om = OnlineMonitor.init(dnsNameServers)
+  om.setPeerStoreToOnlineMonitor(node.switch.peerStore)
+  om.addOnlineStateObserver(node.peerManager.getOnlineStateObserver())
   T(
     nodeHealth: INITIALIZING,
-    node: nil,
-    onlineMonitor: OnlineMonitor.init(dnsNameServers),
+    node: node,
+    onlineMonitor: om,
     connectionStatus: ConnectionStatus.Disconnected,
     strength: initTable[WakuProtocol, int](),
   )

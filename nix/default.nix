@@ -21,8 +21,12 @@ let
   version = tools.findKeyValue "^version = \"([a-f0-9.-]+)\"$" ../waku.nimble;
   revision = lib.substring 0 8 (src.rev or src.dirtyRev or "00000000");
 
+  nimPinned = pkgs.callPackage ./nim.nix {};
+  nimblePinned = pkgs.callPackage ./nimble.nix { inherit nimPinned; };
+
   nimbleDeps = callPackage ./deps.nix {
     inherit src version revision;
+    mynimble = nimblePinned;
   };
 
 in stdenv.mkDerivation {
@@ -34,7 +38,6 @@ in stdenv.mkDerivation {
     ANDROID_SDK_ROOT="${pkgs.androidPkgs.sdk}";
     ANDROID_NDK_HOME="${pkgs.androidPkgs.ndk}";
     NIMFLAGS = "-d:disableMarchNative -d:git_revision_override=${revision}";
-    XDG_CACHE_HOME = "/tmp";
   };
 
   buildInputs = with pkgs; [
@@ -60,7 +63,13 @@ in stdenv.mkDerivation {
   ];
 
   configurePhase = ''
-    export NIMBLE_DIR=$NIX_BUILD_TOP/nimbledeps
+    export HOME=$TMPDIR
+    export XDG_CACHE_HOME=$TMPDIR
+    export NIMBLE_DIR=$TMPDIR/nimbledir
+
+    mkdir -p $NIMBLE_DIR/pkgs2/nim-2.2.6/bin
+    cp -r ${nimPinned}/bin/* $NIMBLE_DIR/pkgs2/nim-2.2.6/bin/
+
     cp -r ${nimbleDeps}/nimbledeps $NIMBLE_DIR
     cp ${nimbleDeps}/nimble.paths ./
     chmod 775 -R $NIMBLE_DIR

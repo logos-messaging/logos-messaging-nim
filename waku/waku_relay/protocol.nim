@@ -296,7 +296,7 @@ proc initRelayObservers(w: WakuRelay) =
       )
 
   proc onRecv(peer: PubSubPeer, msgs: var RPCMsg) =
-    if msgs.control.isSome:
+    if msgs.control.isSome():
       let ctrl = msgs.control.get()
       var topicsChanged = false
 

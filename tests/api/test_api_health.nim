@@ -25,7 +25,7 @@ proc dummyHandler(
 
 proc waitForConnectionStatus(
     brokerCtx: BrokerContext, expected: ConnectionStatus
-): Future[void] {.async.} =
+) {.async.} =
   var future = newFuture[void]("waitForConnectionStatus")
 
   let handler: EventConnectionStatusChangeListenerProc = proc(

@@ -517,6 +517,9 @@ proc loopEdgeHealth(node: WakuNode) {.async.} =
     except CatchableError as e:
       warn "Error in edge health check", error = e.msg
 
+    # safety cooldown to protect from edge cases
+    await sleepAsync(100.milliseconds)
+
 proc startProvidersAndListeners*(node: WakuNode) =
   node.peerEventListener = EventWakuPeer.listen(
     node.brokerCtx,

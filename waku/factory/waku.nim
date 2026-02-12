@@ -444,9 +444,9 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
       try:
         let protocolHealthStatus =
           await waku[].healthMonitor.getProtocolHealthInfo(protocol)
-        ok(RequestProtocolHealth(healthStatus: protocolHealthStatus))
+        return ok(RequestProtocolHealth(healthStatus: protocolHealthStatus))
       except CatchableError:
-        err("Failed to get protocol health: " & getCurrentExceptionMsg()),
+        return err("Failed to get protocol health: " & getCurrentExceptionMsg()),
   ).isOkOr:
     error "Failed to set RequestProtocolHealth provider", error = error
 

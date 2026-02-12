@@ -1,7 +1,7 @@
 import waku/common/broker/event_broker
 import libp2p/switch
 
-type WakuPeerEventKind* = enum
+type WakuPeerEventKind* {.pure.} = enum
   EventConnected
   EventDisconnected
   EventIdentified

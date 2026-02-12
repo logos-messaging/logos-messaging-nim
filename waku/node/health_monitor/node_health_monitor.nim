@@ -498,6 +498,14 @@ proc getSyncNodeHealthReport*(hm: NodeHealthMonitor): HealthReport =
 proc onRelayMsg(
     hm: NodeHealthMonitor, peer: PubSubPeer, msg: var RPCMsg
 ) {.gcsafe, raises: [].} =
+  ## Inspect Relay events for health-update relevance in Core (Relay) mode.
+  ##
+  ## For Core (Relay) mode, the connectivity health state is mostly determined
+  ## by the relay protocol state (it is the dominant factor), and we know
+  ## that a peer Relay can only affect this Relay's health if there is a
+  ## subscription change or a mesh (GRAFT/PRUNE) change.
+  ##
+
   if msg.subscriptions.len == 0:
     if msg.control.isNone():
       return
@@ -505,10 +513,11 @@ proc onRelayMsg(
     if ctrl.graft.len == 0 and ctrl.prune.len == 0:
       return
 
-  # recomputing node health when peer relay events of interest trigger
   hm.healthUpdateEvent.fire()
 
 proc healthLoop(hm: NodeHealthMonitor) {.async.} =
+  ## Re-evaluate the global health state of the node when notified of a potential change,
+  ## and call back the application if an actual change from the last notified state happened.
   info "Health monitor loop start"
   while true:
     try:
@@ -529,6 +538,10 @@ proc healthLoop(hm: NodeHealthMonitor) {.async.} =
       break
     except Exception as e:
       error "HealthMonitor: error in update loop", error = e.msg
+
+    # safety cooldown to protect from edge cases
+    await sleepAsync(100.milliseconds)
+
   info "Health monitor loop end"
 
 proc selectRandomPeersForKeepalive(
@@ -689,6 +702,7 @@ proc startHealthMonitor*(hm: NodeHealthMonitor): Result[void, string] =
   hm.peerEventListener = EventWakuPeer.listen(
     hm.node.brokerCtx,
     proc(evt: EventWakuPeer): Future[void] {.async: (raises: []), gcsafe.} =
+      ## Recompute health on any peer changing anything (join, leave, identify, metadata update)
       hm.healthUpdateEvent.fire(),
   ).valueOr:
     return err("Failed to subscribe to peer events: " & error)

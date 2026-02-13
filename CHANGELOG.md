@@ -1,3 +1,11 @@
+## v0.36.1 (2026-02-13)
+### Features
+- fix: Completely clean dns-discovery-name-server references [#3477](https://github.com/logos-messaging/logos-messaging-nim/pull/3477)
+
+### Bug fixes
+- Fix avoid IndexDefect if DB error message is short [#3725](https://github.com/logos-messaging/logos-messaging-nim/pull/3725)
+- Fix: detach partition [#3535](https://github.com/logos-messaging/logos-messaging-nim/pull/3535)
+
 ## v0.36.0 (2025-06-20)
 ### Notes
 

@@ -25,7 +25,8 @@ import
   ./metrics_server_conf_builder,
   ./rate_limit_conf_builder,
   ./rln_relay_conf_builder,
-  ./mix_conf_builder
+  ./mix_conf_builder,
+  ./kademlia_discovery_conf_builder
 
 logScope:
   topics = "waku conf builder"
@@ -80,6 +81,7 @@ type WakuConfBuilder* = object
   mixConf*: MixConfBuilder
   webSocketConf*: WebSocketConfBuilder
   rateLimitConf*: RateLimitConfBuilder
+  kademliaDiscoveryConf*: KademliaDiscoveryConfBuilder
   # End conf builders
   relay: Option[bool]
   lightPush: Option[bool]
@@ -140,6 +142,7 @@ proc init*(T: type WakuConfBuilder): WakuConfBuilder =
     storeServiceConf: StoreServiceConfBuilder.init(),
     webSocketConf: WebSocketConfBuilder.init(),
     rateLimitConf: RateLimitConfBuilder.init(),
+    kademliaDiscoveryConf: KademliaDiscoveryConfBuilder.init(),
   )
 
 proc withNetworkConf*(b: var WakuConfBuilder, networkConf: NetworkConf) =
@@ -506,6 +509,9 @@ proc build*(
   let rateLimit = builder.rateLimitConf.build().valueOr:
     return err("Rate limits Conf building failed: " & $error)
 
+  let kademliaDiscoveryConf = builder.kademliaDiscoveryConf.build().valueOr:
+    return err("Kademlia Discovery Conf building failed: " & $error)
+
   # End - Build sub-configs
 
   let logLevel =
@@ -628,6 +634,7 @@ proc build*(
     restServerConf: restServerConf,
     dnsDiscoveryConf: dnsDiscoveryConf,
     mixConf: mixConf,
+    kademliaDiscoveryConf: kademliaDiscoveryConf,
     # end confs
     nodeKey: nodeKey,
     clusterId: clusterId,

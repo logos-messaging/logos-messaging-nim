@@ -71,8 +71,10 @@ proc fetchMerkleProofElements*(
 
     return response
   except CatchableError:
-    error "Failed to fetch Merkle proof elements", error = getCurrentExceptionMsg()
-    return err("Failed to fetch merkle proof elements: " & getCurrentExceptionMsg())
+    error "Failed to fetch Merkle proof elements",
+        error = getCurrentExceptionMsg()
+    return err("Failed to fetch merkle proof elements: " &
+        getCurrentExceptionMsg())
 
 proc fetchMerkleRoot*(
     g: OnchainGroupManager
@@ -125,8 +127,10 @@ proc fetchMembershipStatus*(
 
     return ok(responseBytes.len == 32 and responseBytes[^1] == 1'u8)
   except CatchableError:
-    error "Failed to fetch membership set membership", error = getCurrentExceptionMsg()
-    return err("Failed to fetch membership set membership: " & getCurrentExceptionMsg())
+    error "Failed to fetch membership set membership",
+        error = getCurrentExceptionMsg()
+    return err("Failed to fetch membership set membership: " &
+        getCurrentExceptionMsg())
 
 proc fetchMaxMembershipRateLimit*(
     g: OnchainGroupManager
@@ -141,8 +145,10 @@ proc fetchMaxMembershipRateLimit*(
     )
     return maxMembershipRateLimit
   except CatchableError:
-    error "Failed to fetch max membership rate limit", error = getCurrentExceptionMsg()
-    return err("Failed to fetch max membership rate limit: " & getCurrentExceptionMsg())
+    error "Failed to fetch max membership rate limit",
+        error = getCurrentExceptionMsg()
+    return err("Failed to fetch max membership rate limit: " &
+        getCurrentExceptionMsg())
 
 template initializedGuard(g: OnchainGroupManager): untyped =
   if not g.initialized:
@@ -172,7 +178,8 @@ proc updateRoots*(g: OnchainGroupManager): Future[bool] {.async.} =
 
   return false
 
-proc trackRootChanges*(g: OnchainGroupManager) {.async: (raises: [CatchableError]).} =
+proc trackRootChanges*(g: OnchainGroupManager) {.async: (raises: [
+    CatchableError]).} =
   try:
     initializedGuard(g)
     const rpcDelay = 5.seconds
@@ -224,6 +231,9 @@ method register*(
 ): Future[void] {.async: (raises: [Exception]).} =
   initializedGuard(g)
 
+  let dummy_x = 1
+  if dummy_x == 0:
+    debug "dummy pr"
   let ethRpc = g.ethRpc.get()
   let wakuRlnContract = g.wakuRlnContract.get()
 
@@ -302,13 +312,15 @@ method register*(
   g.idCredentials = some(identityCredential)
 
   let rateCommitment = RateCommitment(
-      idCommitment: identityCredential.idCommitment, userMessageLimit: userMessageLimit
+      idCommitment: identityCredential.idCommitment,
+      userMessageLimit: userMessageLimit
     )
     .toLeaf()
     .get()
 
   if g.registerCb.isSome():
-    let member = Membership(rateCommitment: rateCommitment, index: g.latestIndex)
+    let member = Membership(rateCommitment: rateCommitment,
+        index: g.latestIndex)
     await g.registerCb.get()(@[member])
   g.latestIndex.inc()
 
@@ -331,7 +343,8 @@ proc getRootFromProofAndIndex(
   # it's currently not used anywhere, but can be used to verify the root from the proof and index
   # Compute leaf hash from idCommitment and messageLimit
   let messageLimitField = uint64ToField(g.userMessageLimit.get())
-  var hash = poseidon(@[g.idCredentials.get().idCommitment, @messageLimitField]).valueOr:
+  var hash = poseidon(@[g.idCredentials.get().idCommitment,
+      @messageLimitField]).valueOr:
     return err("Failed to compute leaf hash: " & error)
 
   for i in 0 ..< bits.len:
@@ -427,7 +440,8 @@ method generateProof*(
   discard zkproof.copyFrom(proofBytes[0 .. proofOffset - 1])
   discard proofRoot.copyFrom(proofBytes[proofOffset .. rootOffset - 1])
   discard
-    externalNullifier.copyFrom(proofBytes[rootOffset .. externalNullifierOffset - 1])
+    externalNullifier.copyFrom(proofBytes[rootOffset ..
+        externalNullifierOffset - 1])
   discard shareX.copyFrom(proofBytes[externalNullifierOffset .. shareXOffset - 1])
   discard shareY.copyFrom(proofBytes[shareXOffset .. shareYOffset - 1])
   discard nullifier.copyFrom(proofBytes[shareYOffset .. nullifierOffset - 1])
@@ -457,7 +471,8 @@ method verifyProof*(
 
   var normalizedProof = proof
 
-  let externalNullifier = generateExternalNullifier(proof.epoch, proof.rlnIdentifier).valueOr:
+  let externalNullifier = generateExternalNullifier(proof.epoch,
+      proof.rlnIdentifier).valueOr:
     return err("Failed to compute external nullifier: " & error)
   normalizedProof.externalNullifier = externalNullifier
 
@@ -469,10 +484,10 @@ method verifyProof*(
 
   var validProof: bool # out-param
   let ffiOk = verify_with_roots(
-    g.rlnInstance, # RLN context created at init()
+    g.rlnInstance,    # RLN context created at init()
     addr proofBuffer, # (proof + signal)
     addr rootsBuffer, # valid Merkle roots
-    addr validProof # will be set by the FFI call
+    addr validProof   # will be set by the FFI call
     ,
   )
 
@@ -514,7 +529,8 @@ proc establishConnection(
 
   return ok(ethRpc)
 
-method init*(g: OnchainGroupManager): Future[GroupManagerResult[void]] {.async.} =
+method init*(g: OnchainGroupManager): Future[GroupManagerResult[
+    void]] {.async.} =
   # check if the Ethereum client is reachable
   let ethRpc: Web3 = (await establishConnection(g)).valueOr:
     return err("failed to connect to Ethereum clients: " & $error)
@@ -552,12 +568,13 @@ method init*(g: OnchainGroupManager): Future[GroupManagerResult[void]] {.async.}
 
   if g.keystorePath.isSome() and g.keystorePassword.isSome():
     if not fileExists(g.keystorePath.get()):
-      error "File provided as keystore path does not exist", path = g.keystorePath.get()
+      error "File provided as keystore path does not exist",
+          path = g.keystorePath.get()
       return err("File provided as keystore path does not exist")
 
     var keystoreQuery = KeystoreMembership(
       membershipContract:
-        MembershipContract(chainId: $g.chainId, address: g.ethContractAddress)
+      MembershipContract(chainId: $g.chainId, address: g.ethContractAddress)
     )
     if g.membershipIndex.isSome():
       keystoreQuery.treeIndex = MembershipIndex(g.membershipIndex.get())
@@ -577,10 +594,12 @@ method init*(g: OnchainGroupManager): Future[GroupManagerResult[void]] {.async.}
     let idCommitmentUInt256 = keystoreCred.identityCredential.idCommitment.toUInt256()
     let idCommitmentHex = idCommitmentBytes.inHex()
     info "Keystore idCommitment in bytes", idCommitmentBytes = idCommitmentBytes
-    info "Keystore idCommitment in UInt256 ", idCommitmentUInt256 = idCommitmentUInt256
+    info "Keystore idCommitment in UInt256 ",
+        idCommitmentUInt256 = idCommitmentUInt256
     info "Keystore idCommitment in hex ", idCommitmentHex = idCommitmentHex
     let idCommitment = keystoreCred.identityCredential.idCommitment
-    let membershipExists = (await g.fetchMembershipStatus(idCommitment)).valueOr:
+    let membershipExists = (await g.fetchMembershipStatus(
+        idCommitment)).valueOr:
       return err("the commitment does not have a membership: " & error)
     info "membershipExists", membershipExists = membershipExists
 

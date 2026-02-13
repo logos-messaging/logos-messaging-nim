@@ -46,7 +46,7 @@ LABEL version="unknown"
 EXPOSE 30303 60000 8545
 
 # Referenced in the binary
-RUN apk add --no-cache libgcc libpq-dev bind-tools
+RUN apk add --no-cache libgcc libstdc++ libpq-dev bind-tools
 
 # Copy to separate location to accomodate different MAKE_TARGET values
 COPY --from=nim-build /app/build/$MAKE_TARGET /usr/local/bin/

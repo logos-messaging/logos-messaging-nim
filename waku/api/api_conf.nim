@@ -4,6 +4,7 @@ import results
 
 import
   waku/common/utils/parse_size_units,
+  waku/common/logging,
   waku/factory/waku_conf,
   waku/factory/conf_builder/conf_builder,
   waku/factory/networks_config,
@@ -87,6 +88,8 @@ type NodeConfig* {.requiresInit.} = object
   networkingConfig: NetworkingConfig
   ethRpcEndpoints: seq[string]
   p2pReliability: bool
+  logLevel: LogLevel
+  logFormat: LogFormat
 
 proc init*(
     T: typedesc[NodeConfig],
@@ -95,6 +98,8 @@ proc init*(
     networkingConfig: NetworkingConfig = DefaultNetworkingConfig,
     ethRpcEndpoints: seq[string] = @[],
     p2pReliability: bool = false,
+    logLevel: LogLevel = LogLevel.INFO,
+    logFormat: LogFormat = LogFormat.TEXT,
 ): T =
   return T(
     mode: mode,
@@ -102,10 +107,16 @@ proc init*(
     networkingConfig: networkingConfig,
     ethRpcEndpoints: ethRpcEndpoints,
     p2pReliability: p2pReliability,
+    logLevel: logLevel,
+    logFormat: logFormat,
   )
 
 proc toWakuConf*(nodeConfig: NodeConfig): Result[WakuConf, string] =
   var b = WakuConfBuilder.init()
+
+  # Apply log configuration
+  b.withLogLevel(nodeConfig.logLevel)
+  b.withLogFormat(nodeConfig.logFormat)
 
   # Apply networking configuration
   let networkingConfig = nodeConfig.networkingConfig

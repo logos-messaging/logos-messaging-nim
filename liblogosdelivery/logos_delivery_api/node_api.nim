@@ -1,9 +1,10 @@
-import std/[json, options]
+import std/[json, options, strutils]
 import chronos, results, ffi
 import
   waku/factory/waku,
   waku/node/waku_node,
   waku/api/[api, api_conf, types],
+  waku/common/logging,
   waku/events/message_events,
   ../declare_lib,
   ../json_event
@@ -64,11 +65,32 @@ registerReqFFI(CreateNodeRequest, ctx: ptr FFIContext[Waku]):
       clusterId = clusterId,
     )
 
+    # Parse log configuration
+    let logLevel =
+      if jsonNode.hasKey("logLevel"):
+        try:
+          parseEnum[logging.LogLevel](jsonNode["logLevel"].getStr().toUpperAscii())
+        except ValueError:
+          logging.LogLevel.INFO # Default if parsing fails
+      else:
+        logging.LogLevel.INFO
+
+    let logFormat =
+      if jsonNode.hasKey("logFormat"):
+        try:
+          parseEnum[logging.LogFormat](jsonNode["logFormat"].getStr().toUpperAscii())
+        except ValueError:
+          logging.LogFormat.TEXT # Default if parsing fails
+      else:
+        logging.LogFormat.TEXT
+
     # Build node config
     let nodeConfig = NodeConfig.init(
       mode = mode,
       protocolsConfig = protocolsConfig,
       networkingConfig = networkingConfig,
+      logLevel = logLevel,
+      logFormat = logFormat,
     )
 
     # Create the node

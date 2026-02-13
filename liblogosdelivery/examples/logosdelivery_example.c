@@ -1,4 +1,4 @@
-#include "../logosdelivery.h"
+#include "../liblogosdelivery.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -104,7 +104,7 @@ int main() {
 
     // Configuration JSON for creating a node
     const char *config = "{"
-        "\"logLevel\": \"TRACE\","
+        "\"logLevel\": \"DEBUG\","
         // "\"mode\": \"Edge\","
         "\"mode\": \"Core\","
         "\"clusterId\": 42,"

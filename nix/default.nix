@@ -3,17 +3,12 @@
   src ? ../.,
   targets ? ["libwaku-android-arm64"],
   verbosity ? 1,
-  useSystemNim ? true,
-  quickAndDirty ? true,
   stableSystems ? [
     "x86_64-linux" "aarch64-linux"
   ],
   abidir ? null,
   zerokitRln,
 }:
-
-assert pkgs.lib.assertMsg ((src.submodules or true) == true)
-  "Unable to build without submodules. Append '?submodules=1#' to the URI.";
 
 let
   inherit (pkgs) stdenv lib writeScriptBin callPackage;
@@ -24,15 +19,23 @@ let
   version = tools.findKeyValue "^version = \"([a-f0-9.-]+)\"$" ../waku.nimble;
   revision = lib.substring 0 8 (src.rev or src.dirtyRev or "00000000");
 
+  nimbleDeps = callPackage ./deps.nix {
+    inherit src version revision;
+  };
+
 in stdenv.mkDerivation {
-  pname = "logos-messaging-nim";
+  pname = "logos-message-delivery";
+  inherit src;
   version = "${version}-${revision}";
 
-  inherit src;
+  env = {
+    ANDROID_SDK_ROOT="${pkgs.androidPkgs.sdk}";
+    ANDROID_NDK_HOME="${pkgs.androidPkgs.ndk}";
+    NIMFLAGS = "-d:disableMarchNative -d:git_revision_override=${revision}";
+  };
 
-  # Runtime dependencies
   buildInputs = with pkgs; [
-    openssl gmp zip
+    openssl gmp zip bash nim nimble cacert
   ];
 
   # Dependencies that should only exist in the build environment.
@@ -40,47 +43,29 @@ in stdenv.mkDerivation {
     # Fix for Nim compiler calling 'git rev-parse' and 'lsb_release'.
     fakeGit = writeScriptBin "git" "echo ${version}";
   in with pkgs; [
-    cmake which zerokitRln nim-unwrapped-2_2 fakeGit
+    cmake which zerokitRln fakeGit nimbleDeps cargo nimble nim cacert
   ] ++ lib.optionals stdenv.isDarwin [
     pkgs.darwin.cctools gcc # Necessary for libbacktrace
   ];
 
-  # Environment variables required for Android builds
-  ANDROID_SDK_ROOT="${pkgs.androidPkgs.sdk}";
-  ANDROID_NDK_HOME="${pkgs.androidPkgs.ndk}";
-  NIMFLAGS = "-d:disableMarchNative -d:git_revision_override=${revision}";
-  XDG_CACHE_HOME = "/tmp";
-
   makeFlags = targets ++ [
     "V=${toString verbosity}"
-    "QUICK_AND_DIRTY_COMPILER=${if quickAndDirty then "1" else "0"}"
-    "QUICK_AND_DIRTY_NIMBLE=${if quickAndDirty then "1" else "0"}"
-    "USE_SYSTEM_NIM=${if useSystemNim then "1" else "0"}"
     "LIBRLN_FILE=${zerokitRln}/lib/librln.${if abidir != null then "so" else "a"}"
   ];
 
   configurePhase = ''
-    patchShebangs . vendor/nimbus-build-system > /dev/null
-    make nimbus-build-system-paths
-    make nimbus-build-system-nimble-dir
+    export HOME=$TMPDIR
+    export XDG_CACHE_HOME=$TMPDIR
+
+    cp -r ${nimbleDeps}/nimbledeps $NIMBLE_DIR
+    cp ${nimbleDeps}/nimble.paths ./
+    chmod 775 -R $NIMBLE_DIR
+    # Fix relative paths to absolute paths
+    sed -i "s|./nimbledeps|$NIMBLE_DIR|g" nimble.paths
   '';
 
-  # For the Nim v2.2.4 built with NBS we added sat and zippy
-  preBuild = lib.optionalString (!useSystemNim) ''
-    pushd vendor/nimbus-build-system/vendor/Nim
-    mkdir dist
-    mkdir -p dist/nimble/vendor/sat
-    mkdir -p dist/nimble/vendor/checksums
-    mkdir -p dist/nimble/vendor/zippy
-
-    cp -r ${callPackage ./nimble.nix {}}/.    dist/nimble
-    cp -r ${callPackage ./checksums.nix {}}/. dist/checksums
-    cp -r ${callPackage ./csources.nix {}}/.  csources_v2
-    cp -r ${callPackage ./sat.nix {}}/.       dist/nimble/vendor/sat
-    cp -r ${callPackage ./checksums.nix {}}/. dist/nimble/vendor/checksums
-    cp -r ${callPackage ./zippy.nix {}}/.     dist/nimble/vendor/zippy
-    chmod 777 -R dist/nimble csources_v2
-    popd
+  buildPhase = ''
+    nimble --verbose --offline libwakuDynamic --noRefresh --noNimblePath waku.nimble libwaku.so
   '';
 
   installPhase = if abidir != null then ''
@@ -99,8 +84,8 @@ in stdenv.mkDerivation {
   '';
 
   meta = with pkgs.lib; {
-    description = "NWaku derivation to build libwaku for mobile targets using Android NDK and Rust.";
-    homepage = "https://github.com/status-im/nwaku";
+    description = "Logos-message-delivery derivation.";
+    homepage = "https://github.com/logos-messaging/logos-messaging-nim";
     license = licenses.mit;
     platforms = stableSystems;
   };

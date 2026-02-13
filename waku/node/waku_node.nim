@@ -66,6 +66,7 @@ import
     events/health_events,
     events/peer_events,
   ],
+  waku/discovery/waku_kademlia,
   ./net_config,
   ./peer_manager,
   ./health_monitor/health_status,
@@ -141,6 +142,7 @@ type
     wakuRendezvous*: WakuRendezVous
     wakuRendezvousClient*: rendezvous_client.WakuRendezVousClient
     announcedAddresses*: seq[MultiAddress]
+    extMultiAddrsOnly*: bool # When true, skip automatic IP address replacement
     started*: bool # Indicates that node has started listening
     topicSubscriptionQueue*: AsyncEventQueue[SubscriptionEvent]
     rateLimitSettings*: ProtocolRateLimitSettings
@@ -149,6 +151,8 @@ type
     edgeHealthEvent*: AsyncEvent
     edgeHealthLoop: Future[void]
     peerEventListener*: EventWakuPeerListener
+    kademliaDiscoveryLoop*: Future[void]
+    wakuKademlia*: WakuKademlia
 
 proc deduceRelayShard(
     node: WakuNode,
@@ -303,7 +307,7 @@ proc mountAutoSharding*(
   return ok()
 
 proc getMixNodePoolSize*(node: WakuNode): int =
-  return node.wakuMix.getNodePoolSize()
+  return node.wakuMix.poolSize()
 
 proc mountMix*(
     node: WakuNode,
@@ -455,6 +459,11 @@ proc isBindIpWithZeroPort(inputMultiAdd: MultiAddress): bool =
   return false
 
 proc updateAnnouncedAddrWithPrimaryIpAddr*(node: WakuNode): Result[void, string] =
+  # Skip automatic IP replacement if extMultiAddrsOnly is set
+  # This respects the user's explicitly configured announced addresses
+  if node.extMultiAddrsOnly:
+    return ok()
+
   let peerInfo = node.switch.peerInfo
   var announcedStr = ""
   var listenStr = ""
@@ -704,6 +713,9 @@ proc stop*(node: WakuNode) {.async.} =
   if not node.wakuPeerExchangeClient.isNil() and
       not node.wakuPeerExchangeClient.pxLoopHandle.isNil():
     await node.wakuPeerExchangeClient.pxLoopHandle.cancelAndWait()
+
+  if not node.wakuKademlia.isNil():
+    await node.wakuKademlia.stop()
 
   if not node.wakuRendezvous.isNil():
     await node.wakuRendezvous.stopWait()

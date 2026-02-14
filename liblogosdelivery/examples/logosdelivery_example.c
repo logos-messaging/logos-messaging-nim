@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+static int create_node_ok = -1;
+
 // Helper function to extract a JSON string field value
 // Very basic parser - for production use a proper JSON library
 const char* extract_json_field(const char *json, const char *field, char *buffer, size_t bufSize) {
@@ -88,6 +90,11 @@ void event_callback(int ret, const char *msg, size_t len, void *userData) {
 // Simple callback that prints results
 void simple_callback(int ret, const char *msg, size_t len, void *userData) {
     const char *operation = (const char *)userData;
+
+    if (operation != NULL && strcmp(operation, "create_node") == 0) {
+        create_node_ok = (ret == RET_OK) ? 1 : 0;
+    }
+
     if (ret == RET_OK) {
         if (len > 0) {
             printf("[%s] Success: %.*s\n", operation, (int)len, msg);
@@ -107,10 +114,13 @@ int main() {
         "\"logLevel\": \"DEBUG\","
         // "\"mode\": \"Edge\","
         "\"mode\": \"Core\","
-        "\"clusterId\": 42,"
-        "\"numShards\": 8,"
-        // "\"shards\": [0,1,2,3,4,5,6,7],"
-        "\"entryNodes\": [\"/dns4/node-01.do-ams3.misc.logos-chat.status.im/tcp/30303/p2p/16Uiu2HAkxoqUTud5LUPQBRmkeL2xP4iKx2kaABYXomQRgmLUgf78\"],"
+        "\"protocolsConfig\": {"
+            "\"entryNodes\": [\"/dns4/node-01.do-ams3.misc.logos-chat.status.im/tcp/30303/p2p/16Uiu2HAkxoqUTud5LUPQBRmkeL2xP4iKx2kaABYXomQRgmLUgf78\"],"
+            "\"clusterId\": 42,"
+            "\"autoShardingConfig\": {"
+                "\"numShardsInCluster\": 8"
+            "}"
+        "},"
         "\"networkingConfig\": {"
             "\"listenIpv4\": \"0.0.0.0\","
             "\"p2pTcpPort\": 60000,"
@@ -127,6 +137,12 @@ int main() {
 
     // Wait a bit for the callback
     sleep(1);
+
+    if (create_node_ok != 1) {
+        printf("Create node failed, stopping example early.\n");
+        logosdelivery_destroy(ctx, simple_callback, (void *)"destroy");
+        return 1;
+    }
 
     printf("\n2. Setting up event callback...\n");
     logosdelivery_set_event_callback(ctx, event_callback, NULL);

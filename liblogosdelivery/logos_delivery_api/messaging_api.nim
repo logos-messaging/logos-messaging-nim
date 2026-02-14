@@ -13,6 +13,9 @@ proc logosdelivery_subscribe(
     userData: pointer,
     contentTopicStr: cstring,
 ) {.ffi.} =
+  requireInitializedNode(ctx, "Subscribe"):
+    return err(errMsg)
+
   # ContentTopic is just a string type alias
   let contentTopic = ContentTopic($contentTopicStr)
 
@@ -28,6 +31,9 @@ proc logosdelivery_unsubscribe(
     userData: pointer,
     contentTopicStr: cstring,
 ) {.ffi.} =
+  requireInitializedNode(ctx, "Unsubscribe"):
+    return err(errMsg)
+
   # ContentTopic is just a string type alias
   let contentTopic = ContentTopic($contentTopicStr)
 
@@ -43,6 +49,9 @@ proc logosdelivery_send(
     userData: pointer,
     messageJson: cstring,
 ) {.ffi.} =
+  requireInitializedNode(ctx, "Send"):
+    return err(errMsg)
+
   ## Parse the message JSON and send the message
   var jsonNode: JsonNode
   try:

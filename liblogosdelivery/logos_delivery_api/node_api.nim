@@ -1,10 +1,9 @@
-import std/[json, options, strutils]
+import std/json
 import chronos, results, ffi
 import
   waku/factory/waku,
   waku/node/waku_node,
   waku/api/[api, api_conf, types],
-  waku/common/logging,
   waku/events/message_events,
   ../declare_lib,
   ../json_event
@@ -16,82 +15,11 @@ proc `%`*(id: RequestId): JsonNode =
 registerReqFFI(CreateNodeRequest, ctx: ptr FFIContext[Waku]):
   proc(configJson: cstring): Future[Result[string, string]] {.async.} =
     ## Parse the JSON configuration and create a node
-    var jsonNode: JsonNode
-    try:
-      jsonNode = parseJson($configJson)
-    except Exception as e:
-      return err("Failed to parse config JSON: " & e.msg)
-
-    # Extract basic configuration
-    let mode =
-      if jsonNode.hasKey("mode") and jsonNode["mode"].getStr() == "Edge":
-        WakuMode.Edge
-      else:
-        WakuMode.Core
-
-    # Build protocols config
-    var entryNodes: seq[string] = @[]
-    if jsonNode.hasKey("entryNodes"):
-      for node in jsonNode["entryNodes"]:
-        entryNodes.add(node.getStr())
-
-    var staticStoreNodes: seq[string] = @[]
-    if jsonNode.hasKey("staticStoreNodes"):
-      for node in jsonNode["staticStoreNodes"]:
-        staticStoreNodes.add(node.getStr())
-
-    let clusterId =
-      if jsonNode.hasKey("clusterId"):
-        uint16(jsonNode["clusterId"].getInt())
-      else:
-        1u16 # Default cluster ID
-
-    # Build networking config
-    let networkingConfig =
-      if jsonNode.hasKey("networkingConfig"):
-        let netJson = jsonNode["networkingConfig"]
-        NetworkingConfig(
-          listenIpv4: netJson.getOrDefault("listenIpv4").getStr("0.0.0.0"),
-          p2pTcpPort: uint16(netJson.getOrDefault("p2pTcpPort").getInt(60000)),
-          discv5UdpPort: uint16(netJson.getOrDefault("discv5UdpPort").getInt(9000)),
-        )
-      else:
-        DefaultNetworkingConfig
-
-    # Build protocols config
-    let protocolsConfig = ProtocolsConfig.init(
-      entryNodes = entryNodes,
-      staticStoreNodes = staticStoreNodes,
-      clusterId = clusterId,
-    )
-
-    # Parse log configuration
-    let logLevel =
-      if jsonNode.hasKey("logLevel"):
-        try:
-          parseEnum[logging.LogLevel](jsonNode["logLevel"].getStr().toUpperAscii())
-        except ValueError:
-          logging.LogLevel.INFO # Default if parsing fails
-      else:
-        logging.LogLevel.INFO
-
-    let logFormat =
-      if jsonNode.hasKey("logFormat"):
-        try:
-          parseEnum[logging.LogFormat](jsonNode["logFormat"].getStr().toUpperAscii())
-        except ValueError:
-          logging.LogFormat.TEXT # Default if parsing fails
-      else:
-        logging.LogFormat.TEXT
-
-    # Build node config
-    let nodeConfig = NodeConfig.init(
-      mode = mode,
-      protocolsConfig = protocolsConfig,
-      networkingConfig = networkingConfig,
-      logLevel = logLevel,
-      logFormat = logFormat,
-    )
+    let nodeConfig =
+      try:
+        decodeNodeConfigFromJson($configJson)
+      except SerializationError as e:
+        return err("Failed to parse config JSON: " & e.msg)
 
     # Create the node
     ctx.myLib[] = (await api.createNode(nodeConfig)).valueOr:
@@ -129,6 +57,9 @@ proc logosdelivery_create_node(
 proc logosdelivery_start_node(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
+  requireInitializedNode(ctx, "START_NODE"):
+    return err(errMsg)
+
   # setting up outgoing event listeners
   let sentListener = MessageSentEvent.listen(
     ctx.myLib[].brokerCtx,
@@ -166,6 +97,9 @@ proc logosdelivery_start_node(
 proc logosdelivery_stop_node(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
+  requireInitializedNode(ctx, "STOP_NODE"):
+    return err(errMsg)
+
   MessageErrorEvent.dropAllListeners(ctx.myLib[].brokerCtx)
   MessageSentEvent.dropAllListeners(ctx.myLib[].brokerCtx)
   MessagePropagatedEvent.dropAllListeners(ctx.myLib[].brokerCtx)

@@ -434,10 +434,11 @@ docker-liteprotocoltester-push:
 ################
 ## C Bindings ##
 ################
-.PHONY: cbindings cwaku_example libwaku
+.PHONY: cbindings cwaku_example libwaku liblogosdelivery liblogosdelivery_example
 
 STATIC ?= 0
-BUILD_COMMAND ?= libwakuDynamic
+LIBWAKU_BUILD_COMMAND ?= libwakuDynamic
+LIBLOGOSDELIVERY_BUILD_COMMAND ?= liblogosdeliveryDynamic
 
 ifeq ($(detected_OS),Windows)
 	LIB_EXT_DYNAMIC = dll
@@ -453,11 +454,40 @@ endif
 LIB_EXT := $(LIB_EXT_DYNAMIC)
 ifeq ($(STATIC), 1)
 	LIB_EXT = $(LIB_EXT_STATIC)
-	BUILD_COMMAND = libwakuStatic
+	LIBWAKU_BUILD_COMMAND = libwakuStatic
+	LIBLOGOSDELIVERY_BUILD_COMMAND = liblogosdeliveryStatic
 endif
 
 libwaku: | build deps librln
-	echo -e $(BUILD_MSG) "build/$@.$(LIB_EXT)" && $(ENV_SCRIPT) nim $(BUILD_COMMAND) $(NIM_PARAMS) waku.nims $@.$(LIB_EXT)
+	echo -e $(BUILD_MSG) "build/$@.$(LIB_EXT)" && $(ENV_SCRIPT) nim $(LIBWAKU_BUILD_COMMAND) $(NIM_PARAMS) waku.nims $@.$(LIB_EXT)
+
+liblogosdelivery: | build deps librln
+	echo -e $(BUILD_MSG) "build/$@.$(LIB_EXT)" && $(ENV_SCRIPT) nim $(LIBLOGOSDELIVERY_BUILD_COMMAND) $(NIM_PARAMS) waku.nims $@.$(LIB_EXT)
+
+logosdelivery_example: | build liblogosdelivery
+	@echo -e $(BUILD_MSG) "build/$@"
+ifeq ($(detected_OS),Darwin)
+	gcc -o build/$@ \
+		liblogosdelivery/examples/logosdelivery_example.c \
+		-I./liblogosdelivery \
+		-L./build \
+		-llogosdelivery \
+		-Wl,-rpath,./build
+else ifeq ($(detected_OS),Linux)
+	gcc -o build/$@ \
+		liblogosdelivery/examples/logosdelivery_example.c \
+		-I./liblogosdelivery \
+		-L./build \
+		-llogosdelivery \
+		-Wl,-rpath,'$$ORIGIN'
+else ifeq ($(detected_OS),Windows)
+	gcc -o build/$@.exe \
+		liblogosdelivery/examples/logosdelivery_example.c \
+		-I./liblogosdelivery \
+		-L./build \
+		-llogosdelivery \
+		-lws2_32
+endif
 
 #####################
 ## Mobile Bindings ##

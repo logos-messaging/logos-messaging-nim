@@ -71,6 +71,13 @@
           zerokitRln = zerokit.packages.${system}.rln;
         };
 
+        liblogosdelivery = pkgs.callPackage ./nix/default.nix {
+          inherit stableSystems;
+          src = self;
+          targets = ["liblogosdelivery"];
+          zerokitRln = zerokit.packages.${system}.rln;
+        };
+
         default = libwaku;
       });
 

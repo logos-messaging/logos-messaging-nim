@@ -4,6 +4,7 @@ import waku/factory/waku
 import waku/[requests/health_requests, waku_core, waku_node]
 import waku/node/delivery_service/send_service
 import waku/node/delivery_service/subscription_service
+import libp2p/peerid
 import ./[api_conf, types]
 
 logScope:

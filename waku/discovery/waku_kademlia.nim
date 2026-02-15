@@ -1,7 +1,8 @@
 {.push raises: [].}
 
 import
-  std/[options, sequtils],
+  std/[options, sequtils]
+import
   chronos,
   chronicles,
   results,
@@ -110,7 +111,7 @@ proc extractMixPubKey(service: ServiceInfo): Option[Curve25519Key] =
 
   let key = intoCurve25519Key(service.data)
   debug "successfully extracted mix pub key", keyHex = byteutils.toHex(key)
-  some(key)
+  return some(key)
 
 proc remotePeerInfoFrom(record: ExtendedPeerRecord): Option[RemotePeerInfo] =
   debug "processing kademlia record",

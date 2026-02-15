@@ -38,6 +38,7 @@ type
     Static
     PeerExchange
     Dns
+    Kademlia
 
   PeerDirection* = enum
     UnknownDirection

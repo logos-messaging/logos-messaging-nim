@@ -43,9 +43,6 @@ type
   # Keeps track of peer shards
   ShardBook* = ref object of PeerBook[seq[uint16]]
 
-  # Keeps track of Mix protocol public keys of peers
-  MixPubKeyBook* = ref object of PeerBook[Curve25519Key]
-
 proc getPeer*(peerStore: PeerStore, peerId: PeerId): RemotePeerInfo =
   let addresses =
     if peerStore[LastSeenBook][peerId].isSome():
@@ -85,7 +82,7 @@ proc delete*(peerStore: PeerStore, peerId: PeerId) =
 
 proc peers*(peerStore: PeerStore): seq[RemotePeerInfo] =
   let allKeys = concat(
-      toSeq(peerStore[LastSeenBook].book.keys()),
+      toSeq(peerStore[LastSeenOutboundBook].book.keys()),
       toSeq(peerStore[AddressBook].book.keys()),
       toSeq(peerStore[ProtoBook].book.keys()),
       toSeq(peerStore[KeyBook].book.keys()),

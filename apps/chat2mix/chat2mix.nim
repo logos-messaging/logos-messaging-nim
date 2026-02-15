@@ -30,6 +30,7 @@ import
     protobuf/minprotobuf, # message serialisation/deserialisation from and to protobufs
     nameresolving/dnsresolver,
     protocols/mix/curve25519,
+    protocols/mix/mix_protocol,
   ] # define DNS resolution
 import
   waku/[
@@ -38,6 +39,7 @@ import
     waku_lightpush/rpc,
     waku_enr,
     discovery/waku_dnsdisc,
+    discovery/waku_kademlia,
     waku_node,
     node/waku_metrics,
     node/peer_manager,
@@ -453,14 +455,48 @@ proc processInput(rfd: AsyncFD, rng: ref HmacDrbgContext) {.async.} =
   (await node.mountMix(conf.clusterId, mixPrivKey, conf.mixnodes)).isOkOr:
     error "failed to mount waku mix protocol: ", error = $error
     quit(QuitFailure)
-  await node.mountRendezvousClient(conf.clusterId)
+
+  # Setup extended kademlia discovery if bootstrap nodes are provided
+  if conf.kadBootstrapNodes.len > 0:
+    var kadBootstrapPeers: seq[(PeerId, seq[MultiAddress])]
+    for nodeStr in conf.kadBootstrapNodes:
+      let (peerId, ma) = parseFullAddress(nodeStr).valueOr:
+        error "Failed to parse kademlia bootstrap node", node = nodeStr, error = error
+        continue
+      kadBootstrapPeers.add((peerId, @[ma]))
+
+    if kadBootstrapPeers.len > 0:
+      node.wakuKademlia = WakuKademlia.new(
+        node.switch,
+        ExtendedKademliaDiscoveryParams(
+          bootstrapNodes: kadBootstrapPeers,
+          mixPubKey: some(mixPubKey),
+          advertiseMix: false,
+        ),
+        node.peerManager,
+        getMixNodePoolSize = proc(): int {.gcsafe, raises: [].} =
+          if node.wakuMix.isNil():
+            0
+          else:
+            node.getMixNodePoolSize(),
+        isNodeStarted = proc(): bool {.gcsafe, raises: [].} =
+          node.started,
+      ).valueOr:
+        error "failed to setup kademlia discovery", error = error
+        quit(QuitFailure)
+
+  #await node.mountRendezvousClient(conf.clusterId)
 
   await node.start()
 
   node.peerManager.start()
+  if not node.wakuKademlia.isNil():
+    (await node.wakuKademlia.start(minMixPeers = MinMixNodePoolSize)).isOkOr:
+      error "failed to start kademlia discovery", error = error
+      quit(QuitFailure)
 
   await node.mountLibp2pPing()
-  await node.mountPeerExchangeClient()
+  #await node.mountPeerExchangeClient()
   let pubsubTopic = conf.getPubsubTopic(node, conf.contentTopic)
   echo "pubsub topic is: " & pubsubTopic
   let nick = await readNick(transp)
@@ -601,11 +637,6 @@ proc processInput(rfd: AsyncFD, rng: ref HmacDrbgContext) {.async.} =
     node, pubsubTopic, conf.contentTopic, servicePeerInfo, false
   )
   echo "waiting for mix nodes to be discovered..."
-  while true:
-    if node.getMixNodePoolSize() >= MinMixNodePoolSize:
-      break
-    discard await node.fetchPeerExchangePeers()
-    await sleepAsync(1000)
 
   while node.getMixNodePoolSize() < MinMixNodePoolSize:
     info "waiting for mix nodes to be discovered",

@@ -70,20 +70,26 @@ For more context, see https://trunkbaseddevelopment.com/branch-for-release/
 
    6a. **Automated testing**
      - Ensure all the unit tests (specifically js-waku tests) are green against the release candidate.
+
+   6b. **Waku fleet testing**
+      - Start job on `waku.test` [Deployment job](https://ci.infra.status.im/job/nim-waku/), wait for completion of the job. If it fails, then debug it.
+      - After completion, disable [deployment job](https://ci.infra.status.im/job/nim-waku/) so that its version is not updated on every merge to `master`.
+      - Verify at https://fleets.waku.org/ that the fleet is locked to the release candidate version.
+      - Check if the image is created at [Harbor](https://harbor.status.im/harbor/projects/9/repositories/nwaku/artifacts-tab).
+      - Search [Kibana logs](https://kibana.infra.status.im/app/discover) from the previous month (since the last release was deployed) for possible crashes or errors in `waku.test`.
+        - Set time range to "Last 30 days" (or since last release).
+        - Most relevant search query: `(fleet: "waku.test" AND message: "SIGSEGV")`.
+        - Document any crashes or errors found.
+      - If `waku.test` validation is successful, deploy to `waku.sandbox` using the same [Deployment job](https://ci.infra.status.im/job/nim-waku/).
+      - Search [Kibana logs](https://kibana.infra.status.im/app/discover) for `waku.sandbox`: `(fleet: "waku.sandbox" AND message: "SIGSEGV")`.
+      - Enable the `waku.test` fleet again to resume auto-deployment of the latest `master` commit.
+
+   6c. **QA and DST testing**
      - Ask Vac-QA and Vac-DST to run their available tests against the release candidate; share all release candidates with both teams.
 
      > We need an additional report like [this](https://www.notion.so/DST-Reports-1228f96fb65c80729cd1d98a7496fe6f) specifically from the DST team.
 
-   6b. **Waku fleet testing**
-      - Start job on `waku.sandbox` and `waku.test` [Deployment job](https://ci.infra.status.im/job/nim-waku/), wait for completion of the job. If it fails, then debug it.
-      - After completion, disable [deployment job](https://ci.infra.status.im/job/nim-waku/) so that its version is not updated on every merge to `master`.
-      - Verify at https://fleets.waku.org/ that the fleet is locked to the release candidate version.
-      - Check if the image is created at [Harbor](https://harbor.status.im/harbor/projects/9/repositories/nwaku/artifacts-tab).
-      - Search _Kibana_ logs from the previous month (since the last release was deployed) for possible crashes or errors in `waku.test` and `waku.sandbox`.
-        - Most relevant logs are `(fleet: "waku.test" AND message: "SIGSEGV")` OR `(fleet: "waku.sandbox" AND message: "SIGSEGV")`.
-      - Enable the `waku.test` fleet again to resume auto-deployment of the latest `master` commit.
-
-   6c. **Status fleet testing**
+   6d. **Status fleet testing**
      - Deploy release candidate to `status.staging`
      - Perform [sanity check](https://www.notion.so/How-to-test-Nwaku-on-Status-12c6e4b9bf06420ca868bd199129b425) and log results as comments in this issue.
        - Connect 2 instances to `status.staging` fleet, one in relay mode, the other one in light client.

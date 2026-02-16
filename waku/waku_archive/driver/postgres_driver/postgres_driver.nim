@@ -1347,8 +1347,7 @@ proc removePartition(
   (await self.performWriteQuery(detachPartitionQuery)).isOkOr:
     info "detected error when trying to detach partition", error
 
-    if ($error).contains("FINALIZE") or
-        ($error).contains("already pending"):
+    if ($error).contains("FINALIZE") or ($error).contains("already pending"):
       ## We assume "already pending detach in partitioned table ..." as possible error
       debug "enforce detach with FINALIZE because of detected error", error
 

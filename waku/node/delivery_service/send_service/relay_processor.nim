@@ -1,7 +1,7 @@
 import std/options
 import chronos, chronicles
 import waku/[waku_core], waku/waku_lightpush/[common, rpc]
-import waku/requests/health_request
+import waku/requests/health_requests
 import waku/common/broker/broker_context
 import waku/api/types
 import ./[delivery_task, send_processor]
@@ -32,7 +32,7 @@ proc new*(
   )
 
 proc isTopicHealthy(self: RelaySendProcessor, topic: PubsubTopic): bool {.gcsafe.} =
-  let healthReport = RequestRelayTopicsHealth.request(self.brokerCtx, @[topic]).valueOr:
+  let healthReport = RequestShardTopicsHealth.request(self.brokerCtx, @[topic]).valueOr:
     error "isTopicHealthy: failed to get health report", topic = topic, error = error
     return false
 
@@ -70,7 +70,9 @@ method sendImpl*(self: RelaySendProcessor, task: DeliveryTask) {.async.} =
 
   if noOfPublishedPeers > 0:
     info "Message propagated via Relay",
-      requestId = task.requestId, msgHash = task.msgHash.to0xHex(), noOfPeers = noOfPublishedPeers
+      requestId = task.requestId,
+      msgHash = task.msgHash.to0xHex(),
+      noOfPeers = noOfPublishedPeers
     task.state = DeliveryState.SuccessfullyPropagated
     task.deliveryTime = Moment.now()
   else:

@@ -64,7 +64,7 @@ proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
   exec "nim " & lang & " --out:build/" & name & " --mm:refc " & extra_params & " " &
     srcDir & name & ".nim"
 
-proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static") =
+proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static", srcFile = "libwaku.nim", mainPrefix = "libwaku") =
   if not dirExists "build":
     mkDir "build"
   # allow something like "nim nimbus --verbosity:0 --hints:off nimbus.nims"
@@ -73,12 +73,12 @@ proc buildLibrary(lib_name: string, srcDir = "./", params = "", `type` = "static
     extra_params &= " " & paramStr(i)
   if `type` == "static":
     exec "nim c" & " --out:build/" & lib_name &
-      " --threads:on --app:staticlib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:libwaku --skipParentCfg:on -d:discv5_protocol_id=d5waku " &
-      extra_params & " " & srcDir & "libwaku.nim"
+      " --threads:on --app:staticlib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:" & mainPrefix & " --skipParentCfg:on -d:discv5_protocol_id=d5waku " &
+      extra_params & " " & srcDir & srcFile
   else:
     exec "nim c" & " --out:build/" & lib_name &
-      " --threads:on --app:lib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:libwaku --skipParentCfg:off -d:discv5_protocol_id=d5waku " &
-      extra_params & " " & srcDir & "libwaku.nim"
+      " --threads:on --app:lib --opt:size --noMain --mm:refc --header -d:metrics --nimMainPrefix:" & mainPrefix & " --skipParentCfg:off -d:discv5_protocol_id=d5waku " &
+      extra_params & " " & srcDir & srcFile
 
 proc buildMobileAndroid(srcDir = ".", params = "") =
   let cpu = getEnv("CPU")
@@ -400,3 +400,11 @@ task libWakuIOS, "Build the mobile bindings for iOS":
   let srcDir = "./library"
   let extraParams = "-d:chronicles_log_level=ERROR"
   buildMobileIOS srcDir, extraParams
+
+task liblogosdeliveryStatic, "Build the liblogosdelivery (Logos Messaging Delivery API) static library":
+  let lib_name = paramStr(paramCount())
+  buildLibrary lib_name, "liblogosdelivery/", chroniclesParams, "static", "liblogosdelivery.nim", "liblogosdelivery"
+
+task liblogosdeliveryDynamic, "Build the liblogosdelivery (Logos Messaging Delivery API) dynamic library":
+  let lib_name = paramStr(paramCount())
+  buildLibrary lib_name, "liblogosdelivery/", chroniclesParams, "dynamic", "liblogosdelivery.nim", "liblogosdelivery"

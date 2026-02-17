@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LMAPI library emits three types of message delivery events that clients can listen to by registering an event callback using `logosdelivery_set_event_callback()`.
+The liblogosdelivery library emits three types of message delivery events that clients can listen to by registering an event callback using `logosdelivery_set_event_callback()`.
 
 ## Event Types
 

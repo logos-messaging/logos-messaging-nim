@@ -35,23 +35,6 @@ Compile the C example that demonstrates all library features:
 # Using Make (recommended)
 make liblogosdelivery_example
 
-# Or manually on macOS:
-gcc -o build/liblogosdelivery_example \
-    liblogosdelivery/examples/liblogosdelivery_example.c \
-    -I./liblogosdelivery \
-    -L./build \
-    -llmapi \
-    -Wl,-rpath,./build
-
-# Or manually on Linux:
-gcc -o build/liblogosdelivery_example \
-    liblogosdelivery/examples/liblogosdelivery_example.c \
-    -I./liblogosdelivery \
-    -L./build \
-    -llmapi \
-    -Wl,-rpath='$ORIGIN'
-```
-
 ## Running Examples
 
 ```bash
@@ -100,30 +83,6 @@ export DYLD_LIBRARY_PATH=/path/to/build:$DYLD_LIBRARY_PATH
 export LD_LIBRARY_PATH=/path/to/build:$LD_LIBRARY_PATH
 ./build/liblogosdelivery_example
 ```
-
-### Compilation fails
-
-Make sure you've run:
-```bash
-make update
-```
-
-This updates all git submodules which are required for building.
-
-## Static Linking
-
-To link statically instead of dynamically:
-
-```bash
-gcc -o build/logosdelivery_example \
-    liblogosdelivery/examples/logosdelivery_example.c \
-    -I./liblogosdelivery \
-    build/liblogosdelivery.a \
-    -lm -lpthread
-```
-
-Note: Static library is much larger (~129MB) but creates a standalone executable.
-
 ## Cross-Compilation
 
 For cross-compilation, you need to:

@@ -1,7 +1,8 @@
-import std/[json, base64]
+import std/[json]
 import chronos, results, ffi
 import stew/byteutils
 import
+  waku/common/base64,
   waku/factory/waku,
   waku/waku_core/topics/content_topic,
   waku/api/[api, types],
@@ -70,14 +71,9 @@ proc logosdelivery_send(
   if not jsonNode.hasKey("payload"):
     return err("Missing payload field")
 
-  var payload: seq[byte]
-  try:
-    let payloadStr = jsonNode["payload"].getStr()
-    # base64.decode returns string, convert to seq[byte]
-    let decodedStr = base64.decode(payloadStr)
-    payload = cast[seq[byte]](decodedStr)
-  except Exception as e:
-    return err("Failed to decode payload: " & e.msg)
+  let payloadStr = jsonNode["payload"].getStr()
+  let payload = base64.decode(Base64String(payloadStr)).valueOr:
+    return err("invalid payload format: " & error)
 
   # Extract ephemeral flag
   let ephemeral = jsonNode.getOrDefault("ephemeral").getBool(false)

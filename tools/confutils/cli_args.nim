@@ -621,6 +621,20 @@ with the drawback of consuming some more bandwidth.""",
       name: "mixnode"
     .}: seq[MixNodePubInfo]
 
+    # Kademlia Discovery config
+    enableKadDiscovery* {.
+      desc:
+        "Enable extended kademlia discovery. Can be enabled without bootstrap nodes for the first node in the network.",
+      defaultValue: false,
+      name: "enable-kad-discovery"
+    .}: bool
+
+    kadBootstrapNodes* {.
+      desc:
+        "Peer multiaddr for kademlia discovery bootstrap node (must include /p2p/<peerID>). Argument may be repeated.",
+      name: "kad-bootstrap-node"
+    .}: seq[string]
+
     ## websocket config
     websocketSupport* {.
       desc: "Enable websocket:  true|false",
@@ -1056,5 +1070,8 @@ proc toWakuConf*(n: WakuNodeConf): ConfResult[WakuConf] =
   b.webSocketConf.withCertPath(n.websocketSecureCertPath)
 
   b.rateLimitConf.withRateLimits(n.rateLimits)
+
+  b.kademliaDiscoveryConf.withEnabled(n.enableKadDiscovery)
+  b.kademliaDiscoveryConf.withBootstrapNodes(n.kadBootstrapNodes)
 
   return b.build()

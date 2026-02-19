@@ -6,7 +6,8 @@ import
   libp2p/protocols/pubsub/gossipsub,
   libp2p/protocols/connectivity/relay/relay,
   libp2p/nameresolving/dnsresolver,
-  libp2p/crypto/crypto
+  libp2p/crypto/crypto,
+  libp2p/crypto/curve25519
 
 import
   ./internal_config,
@@ -32,6 +33,7 @@ import
   ../waku_store_legacy/common as legacy_common,
   ../waku_filter_v2,
   ../waku_peer_exchange,
+  ../discovery/waku_kademlia,
   ../node/peer_manager,
   ../node/peer_manager/peer_store/waku_peer_storage,
   ../node/peer_manager/peer_store/migrations as peer_store_sqlite_migrations,
@@ -165,12 +167,35 @@ proc setupProtocols(
 
   #mount mix
   if conf.mixConf.isSome():
-    (
-      await node.mountMix(
-        conf.clusterId, conf.mixConf.get().mixKey, conf.mixConf.get().mixnodes
-      )
-    ).isOkOr:
+    let mixConf = conf.mixConf.get()
+    (await node.mountMix(conf.clusterId, mixConf.mixKey, mixConf.mixnodes)).isOkOr:
       return err("failed to mount waku mix protocol: " & $error)
+
+  # Setup extended kademlia discovery
+  if conf.kademliaDiscoveryConf.isSome():
+    let mixPubKey =
+      if conf.mixConf.isSome():
+        some(conf.mixConf.get().mixPubKey)
+      else:
+        none(Curve25519Key)
+
+    node.wakuKademlia = WakuKademlia.new(
+      node.switch,
+      ExtendedKademliaDiscoveryParams(
+        bootstrapNodes: conf.kademliaDiscoveryConf.get().bootstrapNodes,
+        mixPubKey: mixPubKey,
+        advertiseMix: conf.mixConf.isSome(),
+      ),
+      node.peerManager,
+      getMixNodePoolSize = proc(): int {.gcsafe, raises: [].} =
+        if node.wakuMix.isNil():
+          0
+        else:
+          node.getMixNodePoolSize(),
+      isNodeStarted = proc(): bool {.gcsafe, raises: [].} =
+        node.started,
+    ).valueOr:
+      return err("failed to setup kademlia discovery: " & error)
 
   if conf.storeServiceConf.isSome():
     let storeServiceConf = conf.storeServiceConf.get()
@@ -476,6 +501,11 @@ proc startNode*(
   # Maintain relay connections
   if conf.relay:
     node.peerManager.start()
+
+  if not node.wakuKademlia.isNil():
+    let minMixPeers = if conf.mixConf.isSome(): 4 else: 0
+    (await node.wakuKademlia.start(minMixPeers = minMixPeers)).isOkOr:
+      return err("failed to start kademlia discovery: " & error)
 
   return ok()
 

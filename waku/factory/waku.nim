@@ -203,6 +203,9 @@ proc new*(
     else:
       nil
 
+  # Set the extMultiAddrsOnly flag so the node knows not to replace explicit addresses
+  node.extMultiAddrsOnly = wakuConf.endpointConf.extMultiAddrsOnly
+
   node.setupAppCallbacks(wakuConf, appCallbacks, healthMonitor).isOkOr:
     error "Failed setting up app callbacks", error = error
     return err("Failed setting up app callbacks: " & $error)

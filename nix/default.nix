@@ -23,6 +23,10 @@ let
   tools = pkgs.callPackage ./tools.nix {};
   version = tools.findKeyValue "^version = \"([a-f0-9.-]+)\"$" ../waku.nimble;
   revision = lib.substring 0 8 (src.rev or src.dirtyRev or "00000000");
+  copyLibwaku = lib.elem "libwaku" targets;
+  copyLiblogosdelivery = lib.elem "liblogosdelivery" targets;
+  copyWakunode2 = lib.elem "wakunode2" targets;
+  hasKnownInstallTarget = copyLibwaku || copyLiblogosdelivery || copyWakunode2;
 
 in stdenv.mkDerivation {
   pname = "logos-messaging-nim";
@@ -46,8 +50,8 @@ in stdenv.mkDerivation {
   ];
 
   # Environment variables required for Android builds
-  ANDROID_SDK_ROOT="${pkgs.androidPkgs.sdk}";
-  ANDROID_NDK_HOME="${pkgs.androidPkgs.ndk}";
+  ANDROID_SDK_ROOT = "${pkgs.androidPkgs.sdk}";
+  ANDROID_NDK_HOME = "${pkgs.androidPkgs.ndk}";
   NIMFLAGS = "-d:disableMarchNative -d:git_revision_override=${revision}";
   XDG_CACHE_HOME = "/tmp";
 
@@ -61,6 +65,15 @@ in stdenv.mkDerivation {
 
   configurePhase = ''
     patchShebangs . vendor/nimbus-build-system > /dev/null
+
+    # build_nim.sh guards "rm -rf dist/checksums" with NIX_BUILD_TOP != "/build",
+    # but on macOS the nix sandbox uses /private/tmp/... so the check fails and
+    # dist/checksums (provided via preBuild) gets deleted. Fix the check to skip
+    # the removal whenever NIX_BUILD_TOP is set (i.e. any nix build).
+    substituteInPlace vendor/nimbus-build-system/scripts/build_nim.sh \
+      --replace 'if [[ "''${NIX_BUILD_TOP}" != "/build" ]]; then' \
+                'if [[ -z "''${NIX_BUILD_TOP}" ]]; then'
+
     make nimbus-build-system-paths
     make nimbus-build-system-nimble-dir
   '';
@@ -91,11 +104,39 @@ in stdenv.mkDerivation {
   '' else ''
     mkdir -p $out/bin $out/include
 
-    # Copy library files
-    cp build/* $out/bin/ 2>/dev/null || true
+    # Copy artifacts from build directory (created by Make during buildPhase)
+    # Note: build/ is in the source tree, not result/ (which is a post-build symlink)
+    if [ -d build ]; then
+      ${lib.optionalString copyLibwaku ''
+      cp build/libwaku.{so,dylib,dll,a,lib} $out/bin/ 2>/dev/null || true
+      ''}
 
-    # Copy the header file
-    cp library/libwaku.h $out/include/
+      ${lib.optionalString copyLiblogosdelivery ''
+      cp build/liblogosdelivery.{so,dylib,dll,a,lib} $out/bin/ 2>/dev/null || true
+      ''}
+
+      ${lib.optionalString copyWakunode2 ''
+      cp build/wakunode2 $out/bin/ 2>/dev/null || true
+      ''}
+
+      ${lib.optionalString (!hasKnownInstallTarget) ''
+      cp build/lib*.{so,dylib,dll,a,lib} $out/bin/ 2>/dev/null || true
+      ''}
+    fi
+
+    # Copy header files
+    ${lib.optionalString copyLibwaku ''
+    cp library/libwaku.h $out/include/ 2>/dev/null || true
+    ''}
+
+    ${lib.optionalString copyLiblogosdelivery ''
+    cp liblogosdelivery/liblogosdelivery.h $out/include/ 2>/dev/null || true
+    ''}
+
+    ${lib.optionalString (!hasKnownInstallTarget) ''
+    cp library/libwaku.h $out/include/ 2>/dev/null || true
+    cp liblogosdelivery/liblogosdelivery.h $out/include/ 2>/dev/null || true
+    ''}
   '';
 
   meta = with pkgs.lib; {

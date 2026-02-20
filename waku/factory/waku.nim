@@ -35,6 +35,7 @@ import
     node/health_monitor,
     node/waku_metrics,
     node/delivery_service/delivery_service,
+    node/delivery_service/subscription_service,
     rest_api/message_cache,
     rest_api/endpoint/server,
     rest_api/endpoint/builder as rest_server_builder,
@@ -416,6 +417,37 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
   if not waku[].deliveryService.isNil():
     waku[].deliveryService.startDeliveryService()
 
+  ## Subscription Service
+  if not waku.node.wakuRelay.isNil() and not waku.deliveryService.isNil():
+    let subService = waku.deliveryService.subscriptionService
+
+    if waku.node.wakuAutoSharding.isSome():
+      # Subscribe relay to all shards in autosharding.
+      let autoSharding = waku.node.wakuAutoSharding.get()
+      let clusterId = autoSharding.clusterId
+      let numShards = autoSharding.shardCountGenZero
+
+      if numShards > 0:
+        var clusterPubsubTopics = newSeqOfCap[PubsubTopic](numShards)
+
+        for i in 0 ..< numShards:
+          let shardObj = RelayShard(clusterId: clusterId, shardId: uint16(i))
+          clusterPubsubTopics.add(PubsubTopic($shardObj))
+
+        subService.subscribeShard(clusterPubsubTopics).isOkOr:
+          return err("Failed to auto-subscribe Relay to cluster shards: " & error)
+    else:
+      # Fallback to configured shards when no autosharding.
+      if waku.conf.subscribeShards.len > 0:
+        let manualShards = waku.conf.subscribeShards.mapIt(
+          PubsubTopic(
+            $(RelayShard(clusterId: waku.conf.clusterId, shardId: uint16(it)))
+          )
+        )
+
+        subService.subscribeShard(manualShards).isOkOr:
+          return err("Failed to subscribe Relay to manual shards: " & error)
+
   ## Health Monitor
   waku[].healthMonitor.startHealthMonitor().isOkOr:
     return err("failed to start health monitor: " & $error)
@@ -450,7 +482,7 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
   ).isOkOr:
     error "Failed to set RequestProtocolHealth provider", error = error
 
-  ## Setup RequestHealthReport provider (The lost child)
+  ## Setup RequestHealthReport provider
 
   RequestHealthReport.setProvider(
     globalBrokerContext(),

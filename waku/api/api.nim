@@ -48,6 +48,15 @@ proc send*(
 ): Future[Result[RequestId, string]] {.async.} =
   ?checkApiAvailability(w)
 
+  let isSubbed = w.deliveryService.subscriptionService
+    .isSubscribed(envelope.contentTopic)
+    .valueOr(false)
+  if not isSubbed:
+    info "Auto-subscribing to topic on send", contentTopic = envelope.contentTopic
+    let subRes = w.deliveryService.subscriptionService.subscribe(envelope.contentTopic)
+    if subRes.isErr():
+      warn "Failed to auto-subscribe", error = subRes.error
+
   let requestId = RequestId.new(w.rng)
 
   let deliveryTask = DeliveryTask.new(requestId, envelope, w.brokerCtx).valueOr:

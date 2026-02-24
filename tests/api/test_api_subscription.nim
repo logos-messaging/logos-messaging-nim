@@ -6,10 +6,20 @@ import libp2p/[peerid, peerinfo, multiaddress, crypto/crypto]
 import ../testlib/[common, wakucore, wakunode, testasync]
 
 import
-  waku, waku/[waku_node, waku_core, common/broker/broker_context, events/message_events]
+  waku,
+  waku/[
+    waku_node,
+    waku_core,
+    common/broker/broker_context,
+    events/message_events,
+    waku_relay/protocol,
+  ]
 import waku/api/api_conf, waku/factory/waku_conf
 
+# TODO: Edge testing (after EdgeDriver is completed)
+
 const TestTimeout = chronos.seconds(10)
+const NegativeTestTimeout = chronos.seconds(2)
 const DefaultShard = PubsubTopic("/waku/2/rs/1/0")
 
 type ReceiveEventListenerManager = ref object
@@ -69,26 +79,25 @@ proc setupSubscriberNode(conf: NodeConfig): Future[Waku] {.async.} =
     (await startWaku(addr node)).expect("Failed to start subscriber node")
   return node
 
+proc waitForMesh*(node: WakuNode, shard: PubsubTopic) {.async.} =
+  for _ in 0 ..< 50:
+    if node.wakuRelay.getNumPeersInMesh(shard).valueOr(0) > 0:
+      return
+    await sleepAsync(100.milliseconds)
+  raise newException(ValueError, "GossipSub Mesh failed to stabilize")
+
 proc publishWhenMeshReady(
     publisher: WakuNode,
     pubsubTopic: PubsubTopic,
     contentTopic: ContentTopic,
     payload: seq[byte],
-    maxRetries: int = 50,
-    retryDelay: Duration = 200.milliseconds,
 ): Future[Result[int, string]] {.async.} =
-  for _ in 0 ..< maxRetries:
-    let msg = WakuMessage(
-      payload: payload, contentTopic: contentTopic, version: 0, timestamp: now()
-    )
+  await waitForMesh(publisher, pubsubTopic)
 
-    let publishRes = await publisher.publish(some(pubsubTopic), msg)
-    if publishRes.isOk() and publishRes.value > 0:
-      return publishRes
-
-    await sleepAsync(retryDelay)
-
-  return err("Timed out waiting for mesh")
+  let msg = WakuMessage(
+    payload: payload, contentTopic: contentTopic, version: 0, timestamp: now()
+  )
+  return await publisher.publish(some(pubsubTopic), msg)
 
 suite "Messaging API, SubscriptionService":
   var
@@ -111,9 +120,7 @@ suite "Messaging API, SubscriptionService":
     publisherPeerInfo = publisherNode.peerInfo.toRemotePeerInfo()
     publisherPeerId = publisherNode.peerInfo.peerId
 
-    proc dummyHandler(
-        topic: PubsubTopic, msg: WakuMessage
-    ): Future[void] {.async, gcsafe.} =
+    proc dummyHandler(topic: PubsubTopic, msg: WakuMessage) {.async, gcsafe.} =
       discard
 
     publisherNode.subscribe((kind: PubsubSub, topic: DefaultShard), dummyHandler).expect(
@@ -142,19 +149,171 @@ suite "Messaging API, SubscriptionService":
     defer:
       eventManager.teardown()
 
-    const testMessageStr = "Hello, world!"
-    let msgPayload = testMessageStr.toBytes()
+    discard (
+      await publishWhenMeshReady(
+        publisherNode, DefaultShard, testTopic, "Hello, world!".toBytes()
+      )
+    ).expect("Publish failed")
+
+    require await eventManager.waitForEvents(TestTimeout)
+    require eventManager.receivedMessages.len == 1
+    check eventManager.receivedMessages[0].contentTopic == testTopic
+
+  asyncTest "Subscription API, relay node ignores unsubscribed content topics on same shard":
+    subscriberNode = await setupSubscriberNode(createApiNodeConf(WakuMode.Core))
+    await subscriberNode.node.connectToNodes(@[publisherPeerInfo])
+
+    let subbedTopic = ContentTopic("/waku/2/subbed-topic/proto")
+    let ignoredTopic = ContentTopic("/waku/2/ignored-topic/proto")
+    (await subscriberNode.subscribe(subbedTopic)).expect("failed to subscribe")
+
+    let eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+    defer:
+      eventManager.teardown()
 
     discard (
-      await publishWhenMeshReady(publisherNode, DefaultShard, testTopic, msgPayload)
-    ).expect("Timed out waiting for mesh to stabilize")
+      await publishWhenMeshReady(
+        publisherNode, DefaultShard, ignoredTopic, "Ghost Msg".toBytes()
+      )
+    ).expect("Publish failed")
 
-    let receivedInTime = await eventManager.waitForEvents(TestTimeout)
+    check not await eventManager.waitForEvents(NegativeTestTimeout)
+    check eventManager.receivedMessages.len == 0
 
-    # Hard abort if these conditions aren't met to prevent an IndexDefect below
-    require receivedInTime
+  asyncTest "Subscription API, relay node unsubscribe stops message receipt":
+    subscriberNode = await setupSubscriberNode(createApiNodeConf(WakuMode.Core))
+    await subscriberNode.node.connectToNodes(@[publisherPeerInfo])
+    let testTopic = ContentTopic("/waku/2/unsub-test/proto")
+
+    (await subscriberNode.subscribe(testTopic)).expect("failed to subscribe")
+    subscriberNode.unsubscribe(testTopic).expect("failed to unsubscribe")
+
+    let eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+    defer:
+      eventManager.teardown()
+
+    discard (
+      await publishWhenMeshReady(
+        publisherNode, DefaultShard, testTopic, "Should be dropped".toBytes()
+      )
+    ).expect("Publish failed")
+
+    check not await eventManager.waitForEvents(NegativeTestTimeout)
+    check eventManager.receivedMessages.len == 0
+
+  asyncTest "Subscription API, overlapping topics on same shard maintain correct isolation":
+    subscriberNode = await setupSubscriberNode(createApiNodeConf(WakuMode.Core))
+    await subscriberNode.node.connectToNodes(@[publisherPeerInfo])
+
+    let topicA = ContentTopic("/waku/2/topic-a/proto")
+    let topicB = ContentTopic("/waku/2/topic-b/proto")
+    (await subscriberNode.subscribe(topicA)).expect("failed to sub A")
+    (await subscriberNode.subscribe(topicB)).expect("failed to sub B")
+
+    let eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+    defer:
+      eventManager.teardown()
+
+    await waitForMesh(publisherNode, DefaultShard)
+
+    subscriberNode.unsubscribe(topicA).expect("failed to unsub A")
+
+    discard (
+      await publisherNode.publish(
+        some(DefaultShard),
+        WakuMessage(
+          payload: "Dropped Message".toBytes(),
+          contentTopic: topicA,
+          version: 0,
+          timestamp: now(),
+        ),
+      )
+    ).expect("Publish A failed")
+
+    discard (
+      await publisherNode.publish(
+        some(DefaultShard),
+        WakuMessage(
+          payload: "Kept Msg".toBytes(),
+          contentTopic: topicB,
+          version: 0,
+          timestamp: now(),
+        ),
+      )
+    ).expect("Publish B failed")
+
+    require await eventManager.waitForEvents(TestTimeout)
     require eventManager.receivedMessages.len == 1
+    check eventManager.receivedMessages[0].contentTopic == topicB
 
-    let receivedMsg = eventManager.receivedMessages[0]
-    check receivedMsg.contentTopic == testTopic
-    check string.fromBytes(receivedMsg.payload) == testMessageStr
+  asyncTest "Subscription API, redundant subs tolerated and subs are removed":
+    subscriberNode = await setupSubscriberNode(createApiNodeConf(WakuMode.Core))
+    await subscriberNode.node.connectToNodes(@[publisherPeerInfo])
+    let glitchTopic = ContentTopic("/waku/2/glitch/proto")
+
+    (await subscriberNode.subscribe(glitchTopic)).expect("failed to sub")
+    (await subscriberNode.subscribe(glitchTopic)).expect("failed to double sub")
+    subscriberNode.unsubscribe(glitchTopic).expect("failed to unsub")
+
+    let eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+    defer:
+      eventManager.teardown()
+
+    discard (
+      await publishWhenMeshReady(
+        publisherNode, DefaultShard, glitchTopic, "Ghost Msg".toBytes()
+      )
+    ).expect("Publish failed")
+
+    check not await eventManager.waitForEvents(NegativeTestTimeout)
+    check eventManager.receivedMessages.len == 0
+
+  asyncTest "Subscription API, resubscribe to an unsubscribed topic":
+    subscriberNode = await setupSubscriberNode(createApiNodeConf(WakuMode.Core))
+    await subscriberNode.node.connectToNodes(@[publisherPeerInfo])
+    let testTopic = ContentTopic("/waku/2/resub-test/proto")
+
+    # Subscribe
+    (await subscriberNode.subscribe(testTopic)).expect("Initial sub failed")
+
+    var eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+    discard (
+      await publishWhenMeshReady(
+        publisherNode, DefaultShard, testTopic, "Msg 1".toBytes()
+      )
+    ).expect("Pub 1 failed")
+
+    require await eventManager.waitForEvents(TestTimeout)
+    eventManager.teardown()
+
+    # Unsubscribe and verify teardown
+    subscriberNode.unsubscribe(testTopic).expect("Unsub failed")
+    eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+
+    discard (
+      await publisherNode.publish(
+        some(DefaultShard),
+        WakuMessage(
+          payload: "Ghost".toBytes(),
+          contentTopic: testTopic,
+          version: 0,
+          timestamp: now(),
+        ),
+      )
+    ).expect("Ghost pub failed")
+
+    check not await eventManager.waitForEvents(NegativeTestTimeout)
+    eventManager.teardown()
+
+    # Resubscribe
+    (await subscriberNode.subscribe(testTopic)).expect("Resub failed")
+    eventManager = newReceiveEventListenerManager(subscriberNode.brokerCtx, 1)
+
+    discard (
+      await publishWhenMeshReady(
+        publisherNode, DefaultShard, testTopic, "Msg 2".toBytes()
+      )
+    ).expect("Pub 2 failed")
+
+    require await eventManager.waitForEvents(TestTimeout)
+    check eventManager.receivedMessages[0].payload == "Msg 2".toBytes()

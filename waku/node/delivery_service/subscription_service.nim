@@ -4,39 +4,109 @@ import
     waku_core,
     waku_core/topics,
     waku_core/topics/sharding,
-    events/message_events,
     waku_node,
     waku_relay,
     common/broker/broker_context,
+    events/delivery_events,
+    node/edge_driver,
   ]
 
 type SubscriptionService* = ref object of RootObj
   node: WakuNode
-  shardSubs: HashSet[PubsubTopic]
   contentTopicSubs: Table[PubsubTopic, HashSet[ContentTopic]]
-  relayHandler: WakuRelayHandler
+    ## Map of Shard to ContentTopic needed because e.g. WakuRelay is PubsubTopic only.
+    ## A present key with an empty HashSet value means pubsubtopic already subscribed
+    ## (via subscribeShard()) but there's no specific content topic interest yet.
+  filterSubListener: OnFilterSubscribeEventListener
+  filterUnsubListener: OnFilterUnsubscribeEventListener
 
 proc new*(T: typedesc[SubscriptionService], node: WakuNode): T =
-  let service = SubscriptionService(
-    node: node,
-    shardSubs: initHashSet[PubsubTopic](),
-    contentTopicSubs: initTable[PubsubTopic, HashSet[ContentTopic]](),
+  SubscriptionService(
+    node: node, contentTopicSubs: initTable[PubsubTopic, HashSet[ContentTopic]]()
   )
 
-  service.relayHandler = proc(
-      topic: PubsubTopic, msg: WakuMessage
-  ) {.async.} =
-    if not service.contentTopicSubs.hasKey(topic) or
-        not service.contentTopicSubs[topic].contains(msg.contentTopic):
-      return
+proc addContentTopicInterest(
+    self: SubscriptionService, shard: PubsubTopic, topic: ContentTopic
+) =
+  try:
+    if not self.contentTopicSubs.hasKey(shard):
+      self.contentTopicSubs[shard] = initHashSet[ContentTopic]()
 
-    let msgHash = computeMessageHash(topic, msg).to0xHex()
-    info "MessageReceivedEvent",
-      pubsubTopic = topic, contentTopic = msg.contentTopic, msgHash = msgHash
+    if not self.contentTopicSubs[shard].contains(topic):
+      self.contentTopicSubs[shard].incl(topic)
 
-    MessageReceivedEvent.emit(service.node.brokerCtx, msgHash, msg)
+      # Always notify EdgeDriver if filter is mounted
+      if not isNil(self.node.wakuFilterClient):
+        self.node.edgeDriver.subscribe(shard, topic)
+  except KeyError:
+    discard
 
-  return service
+proc removeContentTopicInterest(
+    self: SubscriptionService, shard: PubsubTopic, topic: ContentTopic
+) =
+  try:
+    if self.contentTopicSubs.hasKey(shard) and
+        self.contentTopicSubs[shard].contains(topic):
+      self.contentTopicSubs[shard].excl(topic)
+
+      # Only delete the shard tracking if we are not running a Relay.
+      # If Relay is mounted, we keep the empty HashSet to signal the relay shard sub.
+      if self.contentTopicSubs[shard].len == 0 and isNil(self.node.wakuRelay):
+        self.contentTopicSubs.del(shard)
+
+      if not isNil(self.node.wakuFilterClient):
+        self.node.edgeDriver.unsubscribe(shard, topic)
+  except KeyError:
+    discard
+
+proc startProvidersAndListeners*(self: SubscriptionService): Result[void, string] =
+  self.filterSubListener = OnFilterSubscribeEvent.listen(
+    self.node.brokerCtx,
+    proc(event: OnFilterSubscribeEvent) {.async: (raises: []), gcsafe.} =
+      for cTopic in event.contentTopics:
+        self.addContentTopicInterest(event.pubsubTopic, cTopic),
+  ).valueOr:
+    return
+      err("SubscriptionService failed to listen to OnFilterSubscribeEvent: " & error)
+
+  self.filterUnsubListener = OnFilterUnsubscribeEvent.listen(
+    self.node.brokerCtx,
+    proc(event: OnFilterUnsubscribeEvent) {.async: (raises: []), gcsafe.} =
+      for cTopic in event.contentTopics:
+        self.removeContentTopicInterest(event.pubsubTopic, cTopic),
+  ).valueOr:
+    return
+      err("SubscriptionService failed to listen to OnFilterUnsubscribeEvent: " & error)
+
+  return ok()
+
+proc stopProvidersAndListeners*(self: SubscriptionService) =
+  OnFilterSubscribeEvent.dropListener(self.node.brokerCtx, self.filterSubListener)
+  OnFilterUnsubscribeEvent.dropListener(self.node.brokerCtx, self.filterUnsubListener)
+
+proc start*(self: SubscriptionService) =
+  self.startProvidersAndListeners().isOkOr:
+    error "Fatal error in SubscriptionService.startProvidersAndListeners(): ",
+      error = error
+    raise newException(ValueError, "SubscriptionService.start() failed: " & error)
+
+proc stop*(self: SubscriptionService) =
+  self.stopProvidersAndListeners()
+
+proc getActiveSubscriptions*(
+    self: SubscriptionService
+): seq[tuple[pubsubTopic: string, contentTopics: seq[ContentTopic]]] =
+  var activeSubs: seq[tuple[pubsubTopic: string, contentTopics: seq[ContentTopic]]] =
+    @[]
+
+  for pubsub, cTopicSet in self.contentTopicSubs.pairs:
+    if cTopicSet.len > 0:
+      var cTopicSeq = newSeqOfCap[ContentTopic](cTopicSet.len)
+      for t in cTopicSet:
+        cTopicSeq.add(t)
+      activeSubs.add((pubsub, cTopicSeq))
+
+  return activeSubs
 
 proc getShardForContentTopic(
     self: SubscriptionService, topic: ContentTopic
@@ -45,123 +115,89 @@ proc getShardForContentTopic(
     let shardObj = ?self.node.wakuAutoSharding.get().getShard(topic)
     return ok($shardObj)
 
-  return
-    err("Manual sharding is not supported in this API. Autosharding must be enabled.")
-
-proc doSubscribe(self: SubscriptionService, shard: PubsubTopic): Result[void, string] =
-  self.node.subscribe((kind: PubsubSub, topic: shard), self.relayHandler).isOkOr:
-    error "Failed to subscribe to Relay shard", shard = shard, error = error
-    return err("Failed to subscribe: " & error)
-  return ok()
-
-proc doUnsubscribe(
-    self: SubscriptionService, shard: PubsubTopic
-): Result[void, string] =
-  self.node.unsubscribe((kind: PubsubUnsub, topic: shard)).isOkOr:
-    error "Failed to unsubscribe from Relay shard", shard = shard, error = error
-    return err("Failed to unsubscribe: " & error)
-  return ok()
+  return err("SubscriptionService requires AutoSharding")
 
 proc isSubscribed*(
     self: SubscriptionService, topic: ContentTopic
 ): Result[bool, string] =
-  if self.node.wakuRelay.isNil():
-    return err("SubscriptionService currently only supports Relay (Core) mode.")
-
   let shard = ?self.getShardForContentTopic(topic)
+  return ok(
+    self.contentTopicSubs.hasKey(shard) and self.contentTopicSubs[shard].contains(topic)
+  )
 
-  if self.contentTopicSubs.hasKey(shard) and self.contentTopicSubs[shard].contains(
-    topic
-  ):
-    return ok(true)
-
-  return ok(false)
-
-proc subscribe*(self: SubscriptionService, topic: ContentTopic): Result[void, string] =
-  if self.node.wakuRelay.isNil():
-    return err("SubscriptionService currently only supports Relay (Core) mode.")
-
-  let shard = ?self.getShardForContentTopic(topic)
-
-  let needShardSub =
-    not self.shardSubs.contains(shard) and not self.contentTopicSubs.hasKey(shard)
-
-  if needShardSub:
-    ?self.doSubscribe(shard)
-
-  self.contentTopicSubs.mgetOrPut(shard, initHashSet[ContentTopic]()).incl(topic)
-
-  return ok()
-
-proc unsubscribe*(
-    self: SubscriptionService, topic: ContentTopic
-): Result[void, string] =
-  if self.node.wakuRelay.isNil():
-    return err("SubscriptionService currently only supports Relay (Core) mode.")
-
-  let shard = ?self.getShardForContentTopic(topic)
-
-  if self.contentTopicSubs.hasKey(shard) and self.contentTopicSubs[shard].contains(
-    topic
-  ):
-    let isLastTopic = self.contentTopicSubs[shard].len == 1
-    let needShardUnsub = isLastTopic and not self.shardSubs.contains(shard)
-
-    if needShardUnsub:
-      ?self.doUnsubscribe(shard)
-
-    self.contentTopicSubs[shard].excl(topic)
-    if self.contentTopicSubs[shard].len == 0:
-      self.contentTopicSubs.del(shard)
-
-  return ok()
+proc isSubscribed*(
+    self: SubscriptionService, shard: PubsubTopic, contentTopic: ContentTopic
+): bool {.raises: [].} =
+  try:
+    return
+      self.contentTopicSubs.hasKey(shard) and
+      self.contentTopicSubs[shard].contains(contentTopic)
+  except KeyError:
+    discard
 
 proc subscribeShard*(
     self: SubscriptionService, shards: seq[PubsubTopic]
 ): Result[void, string] =
-  if self.node.wakuRelay.isNil():
-    return err("SubscriptionService currently only supports Relay (Core) mode.")
+  if isNil(self.node.wakuRelay):
+    return err("subscribeShard requires a Relay")
 
   var errors: seq[string] = @[]
 
   for shard in shards:
-    if not self.shardSubs.contains(shard):
-      let needShardSub = not self.contentTopicSubs.hasKey(shard)
+    if not self.contentTopicSubs.hasKey(shard):
+      self.node.subscribe((kind: PubsubSub, topic: shard), nil).isOkOr:
+        errors.add("shard " & shard & ": " & error)
+        continue
 
-      if needShardSub:
-        let res = self.doSubscribe(shard)
-        if res.isErr():
-          errors.add("Shard " & shard & " failed: " & res.error)
-          continue
-
-      self.shardSubs.incl(shard)
+      self.contentTopicSubs[shard] = initHashSet[ContentTopic]()
 
   if errors.len > 0:
-    return err("Batch subscribe had errors: " & errors.join("; "))
+    return err("subscribeShard errors: " & errors.join("; "))
 
   return ok()
 
 proc unsubscribeShard*(
     self: SubscriptionService, shards: seq[PubsubTopic]
 ): Result[void, string] =
-  if self.node.wakuRelay.isNil():
-    return err("SubscriptionService currently only supports Relay (Core) mode.")
+  if isNil(self.node.wakuRelay):
+    return err("unsubscribeShard requires a Relay")
 
   var errors: seq[string] = @[]
 
   for shard in shards:
-    if self.shardSubs.contains(shard):
-      let needShardUnsub = not self.contentTopicSubs.hasKey(shard)
+    if self.contentTopicSubs.hasKey(shard):
+      self.node.unsubscribe((kind: PubsubUnsub, topic: shard)).isOkOr:
+        errors.add("shard " & shard & ": " & error)
 
-      if needShardUnsub:
-        let res = self.doUnsubscribe(shard)
-        if res.isErr():
-          errors.add("Shard " & shard & " failed: " & res.error)
-          continue
-
-      self.shardSubs.excl(shard)
+      self.contentTopicSubs.del(shard)
 
   if errors.len > 0:
-    return err("Batch unsubscribe had errors: " & errors.join("; "))
+    return err("unsubscribeShard errors: " & errors.join("; "))
+
+  return ok()
+
+proc subscribe*(self: SubscriptionService, topic: ContentTopic): Result[void, string] =
+  if isNil(self.node.wakuRelay) and isNil(self.node.wakuFilterClient):
+    return err("SubscriptionService requires either Relay or Filter Client.")
+
+  let shard = ?self.getShardForContentTopic(topic)
+
+  if not isNil(self.node.wakuRelay) and not self.contentTopicSubs.hasKey(shard):
+    ?self.subscribeShard(@[shard])
+
+  self.addContentTopicInterest(shard, topic)
+
+  return ok()
+
+proc unsubscribe*(
+    self: SubscriptionService, topic: ContentTopic
+): Result[void, string] =
+  if isNil(self.node.wakuRelay) and isNil(self.node.wakuFilterClient):
+    return err("SubscriptionService requires either Relay or Filter Client.")
+
+  let shard = ?self.getShardForContentTopic(topic)
+
+  if self.isSubscribed(shard, topic):
+    self.removeContentTopicInterest(shard, topic)
 
   return ok()

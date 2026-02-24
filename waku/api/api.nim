@@ -53,9 +53,9 @@ proc send*(
     .valueOr(false)
   if not isSubbed:
     info "Auto-subscribing to topic on send", contentTopic = envelope.contentTopic
-    let subRes = w.deliveryService.subscriptionService.subscribe(envelope.contentTopic)
-    if subRes.isErr():
-      warn "Failed to auto-subscribe", error = subRes.error
+    w.deliveryService.subscriptionService.subscribe(envelope.contentTopic).isOkOr:
+      warn "Failed to auto-subscribe", error = error
+      return err("Failed to auto-subscribe before sending: " & error)
 
   let requestId = RequestId.new(w.rng)
 

@@ -159,7 +159,8 @@ proc new*(T: typedesc[RecvService], node: WakuNode, s: SubscriptionService): T =
         pubsubTopic: PubsubTopic, message: WakuMessage
     ) {.async, closure.} =
       ## Captures all the messages received through filter
-      recvService.processIncomingMessageOfInterest(pubSubTopic, message)
+      # TODO: re-enable for MAPI edge support.
+      #recvService.processIncomingMessageOfInterest(pubSubTopic, message)
 
     node.wakuFilterClient.registerPushHandler(filterPushHandler)
 

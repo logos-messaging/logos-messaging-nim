@@ -85,13 +85,17 @@ proc stopProvidersAndListeners*(self: SubscriptionService) =
   OnFilterUnsubscribeEvent.dropListener(self.node.brokerCtx, self.filterUnsubListener)
 
 proc start*(self: SubscriptionService) =
-  self.startProvidersAndListeners().isOkOr:
-    error "Fatal error in SubscriptionService.startProvidersAndListeners(): ",
-      error = error
-    raise newException(ValueError, "SubscriptionService.start() failed: " & error)
+  # TODO: re-enable for MAPI edge support.
+  #self.startProvidersAndListeners().isOkOr:
+  #  error "Fatal error in SubscriptionService.startProvidersAndListeners(): ",
+  #    error = error
+  #  raise newException(ValueError, "SubscriptionService.start() failed: " & error)
+  discard
 
 proc stop*(self: SubscriptionService) =
-  self.stopProvidersAndListeners()
+  # TODO: re-enable for MAPI edge support.
+  #self.stopProvidersAndListeners()
+  discard
 
 proc getActiveSubscriptions*(
     self: SubscriptionService

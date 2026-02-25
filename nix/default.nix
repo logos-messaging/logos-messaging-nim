@@ -50,8 +50,8 @@ in stdenv.mkDerivation {
   ];
 
   # Environment variables required for Android builds
-  ANDROID_SDK_ROOT="${pkgs.androidPkgs.sdk}";
-  ANDROID_NDK_HOME="${pkgs.androidPkgs.ndk}";
+  ANDROID_SDK_ROOT = "${pkgs.androidPkgs.sdk}";
+  ANDROID_NDK_HOME = "${pkgs.androidPkgs.ndk}";
   NIMFLAGS = "-d:disableMarchNative -d:git_revision_override=${revision}";
   XDG_CACHE_HOME = "/tmp";
 
@@ -61,10 +61,20 @@ in stdenv.mkDerivation {
     "QUICK_AND_DIRTY_NIMBLE=${if quickAndDirty then "1" else "0"}"
     "USE_SYSTEM_NIM=${if useSystemNim then "1" else "0"}"
     "LIBRLN_FILE=${zerokitRln}/lib/librln.${if abidir != null then "so" else "a"}"
+    "POSTGRES=1"
   ];
 
   configurePhase = ''
     patchShebangs . vendor/nimbus-build-system > /dev/null
+
+    # build_nim.sh guards "rm -rf dist/checksums" with NIX_BUILD_TOP != "/build",
+    # but on macOS the nix sandbox uses /private/tmp/... so the check fails and
+    # dist/checksums (provided via preBuild) gets deleted. Fix the check to skip
+    # the removal whenever NIX_BUILD_TOP is set (i.e. any nix build).
+    substituteInPlace vendor/nimbus-build-system/scripts/build_nim.sh \
+      --replace 'if [[ "''${NIX_BUILD_TOP}" != "/build" ]]; then' \
+                'if [[ -z "''${NIX_BUILD_TOP}" ]]; then'
+
     make nimbus-build-system-paths
     make nimbus-build-system-nimble-dir
   '';

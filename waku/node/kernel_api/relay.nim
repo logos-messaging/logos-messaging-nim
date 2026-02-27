@@ -98,7 +98,7 @@ proc registerRelayHandler(
     node.wakuStoreReconciliation.messageIngress(topic, msg)
 
   proc internalHandler(topic: PubsubTopic, msg: WakuMessage) {.async, gcsafe.} =
-    MessageReceivedInternalEvent.emit(node.brokerCtx, topic, msg)
+    MessageSeenEvent.emit(node.brokerCtx, topic, msg)
 
   let uniqueTopicHandler = proc(
       topic: PubsubTopic, msg: WakuMessage
@@ -110,7 +110,7 @@ proc registerRelayHandler(
     await internalHandler(topic, msg)
 
     # Call the legacy (kernel API) app handler if it exists.
-    # Normally, hasKey is false and the MessageReceivedInternalEvent bus (new API) is used instead.
+    # Normally, hasKey is false and the MessageSeenEvent bus (new API) is used instead.
     # But we need to support legacy behavior (kernel API use), hence this.
     # NOTE: We can delete `legacyAppHandlers` if instead we refactor WakuRelay to support multiple
     # PubsubTopic handlers, since that's actually supported by libp2p PubSub (bigger refactor...)

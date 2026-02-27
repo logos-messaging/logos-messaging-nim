@@ -37,7 +37,7 @@ type RecvMessage = object
 type RecvService* = ref object of RootObj
   brokerCtx: BrokerContext
   node: WakuNode
-  internalMsgListener: MessageReceivedInternalEventListener
+  seenMsgListener: MessageSeenEventListener
   subscriptionService: SubscriptionService
 
   recentReceivedMsgs: seq[RecvMessage]
@@ -176,9 +176,9 @@ proc startRecvService*(self: RecvService) =
   self.msgCheckerHandler = self.msgChecker()
   self.msgPrunerHandler = self.loopPruneOldMessages()
 
-  self.internalMsgListener = MessageReceivedInternalEvent.listen(
+  self.seenMsgListener = MessageSeenEvent.listen(
     self.brokerCtx,
-    proc(event: MessageReceivedInternalEvent) {.async: (raises: []).} =
+    proc(event: MessageSeenEvent) {.async: (raises: []).} =
       if not self.subscriptionService.isSubscribed(
         event.topic, event.message.contentTopic
       ):
@@ -186,11 +186,11 @@ proc startRecvService*(self: RecvService) =
 
       self.processIncomingMessageOfInterest(event.topic, event.message),
   ).valueOr:
-    error "Failed to set MessageReceivedInternalEvent listener", error = error
+    error "Failed to set MessageSeenEvent listener", error = error
     quit(QuitFailure)
 
 proc stopRecvService*(self: RecvService) {.async.} =
-  MessageReceivedInternalEvent.dropListener(self.brokerCtx, self.internalMsgListener)
+  MessageSeenEvent.dropListener(self.brokerCtx, self.seenMsgListener)
   if not self.msgCheckerHandler.isNil():
     await self.msgCheckerHandler.cancelAndWait()
     self.msgCheckerHandler = nil

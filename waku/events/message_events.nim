@@ -29,6 +29,6 @@ EventBroker:
 
 EventBroker:
   # Internal event emitted when a message arrives from the network via any protocol
-  type MessageReceivedInternalEvent* = object
+  type MessageSeenEvent* = object
     topic*: PubsubTopic
     message*: WakuMessage

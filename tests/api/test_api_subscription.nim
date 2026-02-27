@@ -16,7 +16,7 @@ import
   ]
 import waku/api/api_conf, waku/factory/waku_conf
 
-# TODO: Edge testing (after EdgeDriver is completed)
+# TODO: Edge testing (after MAPI edge support is completed)
 
 const TestTimeout = chronos.seconds(10)
 const NegativeTestTimeout = chronos.seconds(2)

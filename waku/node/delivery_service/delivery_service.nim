@@ -38,9 +38,11 @@ proc new*(
   )
 
 proc startDeliveryService*(self: DeliveryService) =
-  self.sendService.startSendService()
+  self.subscriptionService.startSubscriptionService()
   self.recvService.startRecvService()
+  self.sendService.startSendService()
 
 proc stopDeliveryService*(self: DeliveryService) {.async.} =
   await self.sendService.stopSendService()
   await self.recvService.stopRecvService()
+  await self.subscriptionService.stopSubscriptionService()

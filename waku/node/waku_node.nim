@@ -69,7 +69,6 @@ import
   waku/discovery/waku_kademlia,
   ./net_config,
   ./peer_manager,
-  ./edge_driver,
   ./health_monitor/health_status,
   ./health_monitor/topic_health
 
@@ -115,7 +114,6 @@ type
   WakuNode* = ref object
     peerManager*: PeerManager
     switch*: Switch
-    edgeDriver*: EdgeDriver
     wakuRelay*: WakuRelay
     wakuArchive*: waku_archive.WakuArchive
     wakuLegacyArchive*: waku_archive_legacy.WakuArchive
@@ -235,7 +233,6 @@ proc new*(
   let node = WakuNode(
     peerManager: peerManager,
     switch: switch,
-    edgeDriver: EdgeDriver.new(),
     rng: rng,
     brokerCtx: brokerCtx,
     enr: enr,

@@ -54,7 +54,9 @@ proc new*(
     switch,
     bootstrapNodes = params.bootstrapNodes,
     config = KadDHTConfig.new(
-      validator = kad_types.ExtEntryValidator(), selector = kad_types.ExtEntrySelector()
+      validator = kad_types.ExtEntryValidator(),
+      selector = kad_types.ExtEntrySelector(),
+      purgeStaleEntries = true,
     ),
     codec = ExtendedKademliaDiscoveryCodec,
   )

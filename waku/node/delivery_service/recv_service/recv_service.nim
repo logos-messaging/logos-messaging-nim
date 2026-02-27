@@ -154,15 +154,9 @@ proc new*(T: typedesc[RecvService], node: WakuNode, s: SubscriptionService): T =
     recentReceivedMsgs: @[],
   )
 
-  if not node.wakuFilterClient.isNil():
-    let filterPushHandler = proc(
-        pubsubTopic: PubsubTopic, message: WakuMessage
-    ) {.async, closure.} =
-      ## Captures all the messages received through filter
-      # TODO: re-enable for MAPI edge support.
-      #recvService.processIncomingMessageOfInterest(pubSubTopic, message)
-
-    node.wakuFilterClient.registerPushHandler(filterPushHandler)
+  # TODO: For MAPI Edge support, either call node.wakuFilterClient.registerPushHandler
+  #       so that the RecvService listens to incoming filter messages,
+  #       or have the filter client emit MessageSeenEvent.
 
   return recvService
 

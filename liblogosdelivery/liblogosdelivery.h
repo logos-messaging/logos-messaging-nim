@@ -75,6 +75,18 @@ extern "C"
                                  FFICallBack callback,
                                  void *userData);
 
+  // Push valid Merkle roots (JSON array of hex strings) into the Nim library.
+  // Called by the C++ plugin when roots arrive from the RLN module.
+  int logosdelivery_push_valid_roots(void *ctx,
+                                     const char *rootsJson,
+                                     size_t rootsLen);
+
+  // Push a Merkle proof (JSON object) into the Nim library.
+  // Called by the C++ plugin when a proof is fetched from the RLN module.
+  int logosdelivery_push_merkle_proof(void *ctx,
+                                      const char *proofJson,
+                                      size_t proofLen);
+
 #ifdef __cplusplus
 }
 #endif

@@ -35,6 +35,7 @@ import
     node/health_monitor,
     node/waku_metrics,
     node/delivery_service/delivery_service,
+    node/delivery_service/subscription_manager,
     rest_api/message_cache,
     rest_api/endpoint/server,
     rest_api/endpoint/builder as rest_server_builder,
@@ -453,7 +454,7 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async: (raises: 
   ).isOkOr:
     error "Failed to set RequestProtocolHealth provider", error = error
 
-  ## Setup RequestHealthReport provider (The lost child)
+  ## Setup RequestHealthReport provider
 
   RequestHealthReport.setProvider(
     globalBrokerContext(),
@@ -513,6 +514,10 @@ proc stop*(waku: Waku): Future[Result[void, string]] {.async: (raises: []).} =
 
     if not waku.wakuDiscv5.isNil():
       await waku.wakuDiscv5.stop()
+
+    if not waku.deliveryService.isNil():
+      await waku.deliveryService.stopDeliveryService()
+      waku.deliveryService = nil
 
     if not waku.node.isNil():
       await waku.node.stop()

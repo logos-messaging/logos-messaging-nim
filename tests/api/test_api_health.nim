@@ -1,4 +1,5 @@
 {.used.}
+{.push warning[Deprecated]: off.}
 
 import std/[options, sequtils, times]
 import chronos, testutils/unittests, stew/byteutils, libp2p/[switch, peerinfo]
@@ -6,6 +7,7 @@ import ../testlib/[common, wakucore, wakunode, testasync]
 
 import
   waku,
+  waku/api/api_conf,
   waku/[waku_node, waku_core, waku_relay/protocol, common/broker/broker_context],
   waku/node/health_monitor/[topic_health, health_status, protocol_health, health_report],
   waku/requests/health_requests,
@@ -90,7 +92,7 @@ suite "LM API health checking":
 
     lockNewGlobalBrokerContext:
       let conf = NodeConfig.init(
-        mode = WakuMode.Core,
+        mode = api_conf.WakuMode.Core,
         networkingConfig =
           NetworkingConfig(listenIpv4: "0.0.0.0", p2pTcpPort: 0, discv5UdpPort: 0),
         protocolsConfig = ProtocolsConfig.init(
@@ -268,7 +270,7 @@ suite "LM API health checking":
 
     lockNewGlobalBrokerContext:
       let edgeConf = NodeConfig.init(
-        mode = WakuMode.Edge,
+        mode = api_conf.WakuMode.Edge,
         networkingConfig =
           NetworkingConfig(listenIpv4: "0.0.0.0", p2pTcpPort: 0, discv5UdpPort: 0),
         protocolsConfig = ProtocolsConfig.init(

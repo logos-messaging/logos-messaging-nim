@@ -1,8 +1,9 @@
 {.used.}
+{.push warning[Deprecated]: off.}
 
 import chronos, testutils/unittests, std/options
 
-import waku
+import waku, waku/api/api_conf
 
 suite "Waku API - Create node":
   asyncTest "Create node with minimal configuration":
@@ -27,7 +28,7 @@ suite "Waku API - Create node":
   asyncTest "Create node with full configuration":
     ## Given
     let nodeConfig = NodeConfig.init(
-      mode = Core,
+      mode = api_conf.WakuMode.Core,
       protocolsConfig = ProtocolsConfig.init(
         entryNodes =
           @[
@@ -63,7 +64,7 @@ suite "Waku API - Create node":
   asyncTest "Create node with mixed entry nodes (enrtree, multiaddr)":
     ## Given
     let nodeConfig = NodeConfig.init(
-      mode = Core,
+      mode = api_conf.WakuMode.Core,
       protocolsConfig = ProtocolsConfig.init(
         entryNodes =
           @[

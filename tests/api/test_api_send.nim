@@ -1,4 +1,5 @@
 {.used.}
+{.push warning[Deprecated]: off.}
 
 import std/strutils
 import chronos, testutils/unittests, stew/byteutils, libp2p/[switch, peerinfo]
@@ -116,7 +117,7 @@ proc validate(
   for requestId in manager.errorRequestIds:
     check requestId == expectedRequestId
 
-proc createApiNodeConf(mode: WakuMode = WakuMode.Core): NodeConfig =
+proc createApiNodeConf(mode: api_conf.WakuMode = api_conf.WakuMode.Core): NodeConfig =
   # allocate random ports to avoid port-already-in-use errors
   let netConf = NetworkingConfig(listenIpv4: "0.0.0.0", p2pTcpPort: 0, discv5UdpPort: 0)
 
@@ -408,7 +409,7 @@ suite "Waku API - Send":
 
     var node: Waku
     lockNewGlobalBrokerContext:
-      node = (await createNode(createApiNodeConf(WakuMode.Edge))).valueOr:
+      node = (await createNode(createApiNodeConf(api_conf.WakuMode.Edge))).valueOr:
         raiseAssert error
       (await startWaku(addr node)).isOkOr:
         raiseAssert "Failed to start Waku node: " & error

@@ -61,7 +61,7 @@ void event_callback(int ret, const char *msg, size_t len, void *userData) {
         char messageHash[128];
         extract_json_field(eventJson, "requestId", requestId, sizeof(requestId));
         extract_json_field(eventJson, "messageHash", messageHash, sizeof(messageHash));
-        printf("📤 [EVENT] Message sent - RequestID: %s, Hash: %s\n", requestId, messageHash);
+        printf("[EVENT] Message sent - RequestID: %s, Hash: %s\n", requestId, messageHash);
 
     } else if (strcmp(eventType, "message_error") == 0) {
         char requestId[128];
@@ -70,7 +70,7 @@ void event_callback(int ret, const char *msg, size_t len, void *userData) {
         extract_json_field(eventJson, "requestId", requestId, sizeof(requestId));
         extract_json_field(eventJson, "messageHash", messageHash, sizeof(messageHash));
         extract_json_field(eventJson, "error", error, sizeof(error));
-        printf("❌ [EVENT] Message error - RequestID: %s, Hash: %s, Error: %s\n",
+        printf("[EVENT] Message error - RequestID: %s, Hash: %s, Error: %s\n",
                requestId, messageHash, error);
 
     } else if (strcmp(eventType, "message_propagated") == 0) {
@@ -78,10 +78,10 @@ void event_callback(int ret, const char *msg, size_t len, void *userData) {
         char messageHash[128];
         extract_json_field(eventJson, "requestId", requestId, sizeof(requestId));
         extract_json_field(eventJson, "messageHash", messageHash, sizeof(messageHash));
-        printf("✅ [EVENT] Message propagated - RequestID: %s, Hash: %s\n", requestId, messageHash);
+        printf("[EVENT] Message propagated - RequestID: %s, Hash: %s\n", requestId, messageHash);
 
     } else {
-        printf("ℹ️  [EVENT] Unknown event type: %s\n", eventType);
+        printf("[EVENT] Unknown event type: %s\n", eventType);
     }
 
     free(eventJson);
@@ -109,23 +109,14 @@ void simple_callback(int ret, const char *msg, size_t len, void *userData) {
 int main() {
     printf("=== Logos Messaging API (LMAPI) Example ===\n\n");
 
-    // Configuration JSON for creating a node
+    // Configuration JSON using WakuNodeConf field names (flat structure).
+    // Field names match Nim identifiers from WakuNodeConf in tools/confutils/cli_args.nim.
     const char *config = "{"
         "\"logLevel\": \"DEBUG\","
-        // "\"mode\": \"Edge\","
         "\"mode\": \"Core\","
-        "\"protocolsConfig\": {"
-            "\"entryNodes\": [\"/dns4/node-01.do-ams3.misc.logos-chat.status.im/tcp/30303/p2p/16Uiu2HAkxoqUTud5LUPQBRmkeL2xP4iKx2kaABYXomQRgmLUgf78\"],"
-            "\"clusterId\": 42,"
-            "\"autoShardingConfig\": {"
-                "\"numShardsInCluster\": 8"
-            "}"
-        "},"
-        "\"networkingConfig\": {"
-            "\"listenIpv4\": \"0.0.0.0\","
-            "\"p2pTcpPort\": 60000,"
-            "\"discv5UdpPort\": 9000"
-        "}"
+        "\"clusterId\": 42,"
+        "\"numShardsInNetwork\": 8,"
+        "\"staticnodes\": [\"/dns4/node-01.do-ams3.misc.logos-chat.status.im/tcp/30303/p2p/16Uiu2HAkxoqUTud5LUPQBRmkeL2xP4iKx2kaABYXomQRgmLUgf78\"]"
     "}";
 
     printf("1. Creating node...\n");

@@ -52,6 +52,11 @@ type StartUpCommand* = enum
   noCommand # default, runs waku
   generateRlnKeystore # generates a new RLN keystore
 
+type WakuMode* = enum
+  noMode # default - use explicit CLI flags as-is
+  Core # full service node
+  Edge # client-only node
+
 type WakuNodeConf* = object
   configFile* {.
     desc: "Loads configuration from a TOML file (cmd-line parameters take precedence)",
@@ -150,9 +155,16 @@ type WakuNodeConf* = object
     .}: seq[ProtectedShard]
 
     ## General node config
+    mode* {.
+      desc:
+        "Node operation mode. 'Core' enables relay+service protocols. 'Edge' enables client-only protocols. Default: explicit CLI flags used.",
+      defaultValue: noMode,
+      name: "mode"
+    .}: WakuMode
+
     preset* {.
       desc:
-        "Network preset to use. 'twn' is The RLN-protected Waku Network (cluster 1). Overrides other values.",
+        "Network preset to use. 'twn' is The RLN-protected Waku Network (cluster 1). 'logosdev' is the Logos Dev Network (cluster 2). Overrides other values.",
       defaultValue: "",
       name: "preset"
     .}: string
@@ -907,12 +919,19 @@ proc toNetworkConf(
       "TWN - The Waku Network configuration will not be applied when `--cluster-id=1` is passed in future releases. Use `--preset=twn` instead."
     )
     lcPreset = "twn"
+  if clusterId.isSome() and clusterId.get() == 2:
+    warn(
+      "Logos.dev - Logos.dev configuration will not be applied when `--cluster-id=2` is passed in future releases. Use `--preset=logos.dev` instead."
+    )
+    lcPreset = "logos.dev"
 
   case lcPreset
   of "":
     ok(none(NetworkConf))
   of "twn":
     ok(some(NetworkConf.TheWakuNetworkConf()))
+  of "logos.dev", "logosdev":
+    ok(some(NetworkConf.LogosDevPreset()))
   else:
     err("Invalid --preset value passed: " & lcPreset)
 
@@ -1073,5 +1092,25 @@ proc toWakuConf*(n: WakuNodeConf): ConfResult[WakuConf] =
 
   b.kademliaDiscoveryConf.withEnabled(n.enableKadDiscovery)
   b.kademliaDiscoveryConf.withBootstrapNodes(n.kadBootstrapNodes)
+
+  # Mode-driven configuration overrides
+  case n.mode
+  of Core:
+    b.withRelay(true)
+    b.filterServiceConf.withEnabled(true)
+    b.filterServiceConf.withMaxPeersToServe(20)
+    b.withLightPush(true)
+    b.discv5Conf.withEnabled(true)
+    b.withPeerExchange(true)
+    b.withRendezvous(true)
+    b.rateLimitConf.withRateLimits(@["filter:100/1s", "lightpush:5/1s", "px:5/1s"])
+  of Edge:
+    b.withPeerExchange(true)
+    b.withRelay(false)
+    b.filterServiceConf.withEnabled(false)
+    b.withLightPush(false)
+    b.storeServiceConf.withEnabled(false)
+  of noMode:
+    discard # use explicit CLI flags as-is
 
   return b.build()

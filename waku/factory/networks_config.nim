@@ -54,6 +54,32 @@ proc TheWakuNetworkConf*(T: type NetworkConf): NetworkConf =
       ],
   )
 
+# cluster-id=2 (Logos Dev Network)
+# Cluster configuration for the Logos Dev Network.
+proc LogosDevPreset*(T: type NetworkConf): NetworkConf =
+  const ZeroChainId = 0'u256
+  return NetworkConf(
+    maxMessageSize: "150KiB",
+    clusterId: 2,
+    rlnRelay: false,
+    rlnRelayEthContractAddress: "",
+    rlnRelayDynamic: false,
+    rlnRelayChainId: ZeroChainId,
+    rlnEpochSizeSec: 0,
+    rlnRelayUserMessageLimit: 0,
+    shardingConf: ShardingConf(kind: AutoSharding, numShardsInCluster: 8),
+    discv5Discovery: true,
+    discv5BootstrapNodes:
+      @[
+        "/dns4/delivery-01.do-ams3.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAmTUbnxLGT9JvV6mu9oPyDjqHK4Phs1VDJNUgESgNSkuby",
+        "/dns4/delivery-02.do-ams3.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAmMK7PYygBtKUQ8EHp7EfaD3bCEsJrkFooK8RQ2PVpJprH",
+        "/dns4/delivery-01.gc-us-central1-a.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAm4S1JYkuzDKLKQvwgAhZKs9otxXqt8SCGtB4hoJP1S397",
+        "/dns4/delivery-02.gc-us-central1-a.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAm8Y9kgBNtjxvCnf1X6gnZJW5EGE4UwwCL3CCm55TwqBiH",
+        "/dns4/delivery-01.ac-cn-hongkong-c.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAm8YokiNun9BkeA1ZRmhLbtNUvcwRr64F69tYj9fkGyuEP",
+        "/dns4/delivery-02.ac-cn-hongkong-c.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAkvwhGHKNry6LACrB8TmEFoCJKEX29XR5dDUzk3UT3UNSE",
+      ],
+  )
+
 proc validateShards*(
     shardingConf: ShardingConf, shards: seq[uint16]
 ): Result[void, string] =

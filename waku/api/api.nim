@@ -1,21 +1,36 @@
-import chronicles, chronos, results, std/strutils
+import chronicles, chronos, results
 
 import waku/factory/waku
 import waku/[requests/health_requests, waku_core, waku_node]
 import waku/node/delivery_service/send_service
 import waku/node/delivery_service/subscription_manager
 import libp2p/peerid
+import ../../tools/confutils/cli_args
 import ./[api_conf, types]
+
+export cli_args
 
 logScope:
   topics = "api"
 
-# TODO: Specs says it should return a `WakuNode`. As `send` and other APIs are defined, we can align.
-proc createNode*(config: NodeConfig): Future[Result[Waku, string]] {.async.} =
-  let wakuConf = toWakuConf(config).valueOr:
+proc createNode*(conf: WakuNodeConf): Future[Result[Waku, string]] {.async.} =
+  let wakuConf = conf.toWakuConf().valueOr:
     return err("Failed to handle the configuration: " & error)
 
   ## We are not defining app callbacks at node creation
+  let wakuRes = (await Waku.new(wakuConf)).valueOr:
+    error "waku initialization failed", error = error
+    return err("Failed setting up Waku: " & $error)
+
+  return ok(wakuRes)
+
+# Deprecated: use WakuNodeConf overload instead
+proc createNode*(
+    config: NodeConfig
+): Future[Result[Waku, string]] {.async, deprecated: "Use WakuNodeConf overload".} =
+  let wakuConf = toWakuConf(config).valueOr:
+    return err("Failed to handle the configuration: " & error)
+
   let wakuRes = (await Waku.new(wakuConf)).valueOr:
     error "waku initialization failed", error = error
     return err("Failed setting up Waku: " & $error)

@@ -30,10 +30,7 @@ proc logosdelivery_get_node_info(
   return ok(ctx.myLib[].stateInfo.getNodeInfoItem(infoItemIdEnum))
 
 proc logosdelivery_get_available_configs(
-    ctx: ptr FFIContext[Waku],
-    callback: FFICallBack,
-    userData: pointer,
-    nodeInfoId: cstring,
+    ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
   ## Returns information about the accepted config items.
   ## For analogy with a CLI app, this is the info when typing --help for a command.

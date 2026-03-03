@@ -14,7 +14,8 @@ import
     events/message_events,
     waku_relay/protocol,
   ]
-import waku/api/api_conf, waku/factory/waku_conf
+import waku/factory/waku_conf
+import tools/confutils/cli_args
 
 # TODO: Edge testing (after MAPI edge support is completed)
 
@@ -64,21 +65,21 @@ type TestNetwork = ref object
   publisherPeerInfo: RemotePeerInfo
 
 proc createApiNodeConf(
-    mode: WakuMode = WakuMode.Core, numShards: uint16 = 1
-): NodeConfig =
-  let netConf = NetworkingConfig(listenIpv4: "0.0.0.0", p2pTcpPort: 0, discv5UdpPort: 0)
-  result = NodeConfig.init(
-    mode = mode,
-    protocolsConfig = ProtocolsConfig.init(
-      entryNodes = @[],
-      clusterId = 1,
-      autoShardingConfig = AutoShardingConfig(numShardsInCluster: numShards),
-    ),
-    networkingConfig = netConf,
-    p2pReliability = true,
-  )
+    mode: cli_args.WakuMode = cli_args.WakuMode.Core, numShards: uint16 = 1
+): WakuNodeConf =
+  var conf = defaultWakuNodeConf().valueOr:
+    raiseAssert error
+  conf.mode = mode
+  conf.listenAddress = parseIpAddress("0.0.0.0")
+  conf.tcpPort = Port(0)
+  conf.discv5UdpPort = Port(0)
+  conf.clusterId = 3'u16
+  conf.numShardsInNetwork = numShards
+  conf.reliabilityEnabled = true
+  conf.rest = false
+  result = conf
 
-proc setupSubscriberNode(conf: NodeConfig): Future[Waku] {.async.} =
+proc setupSubscriberNode(conf: WakuNodeConf): Future[Waku] {.async.} =
   var node: Waku
   lockNewGlobalBrokerContext:
     node = (await createNode(conf)).expect("Failed to create subscriber node")
@@ -86,14 +87,14 @@ proc setupSubscriberNode(conf: NodeConfig): Future[Waku] {.async.} =
   return node
 
 proc setupNetwork(
-    numShards: uint16 = 1, mode: WakuMode = WakuMode.Core
+    numShards: uint16 = 1, mode: cli_args.WakuMode = cli_args.WakuMode.Core
 ): Future[TestNetwork] {.async.} =
   var net = TestNetwork()
 
   lockNewGlobalBrokerContext:
     net.publisher =
       newTestWakuNode(generateSecp256k1Key(), parseIpAddress("0.0.0.0"), Port(0))
-    net.publisher.mountMetadata(1, @[0'u16]).expect("Failed to mount metadata")
+    net.publisher.mountMetadata(3, @[0'u16]).expect("Failed to mount metadata")
     (await net.publisher.mountRelay()).expect("Failed to mount relay")
     await net.publisher.mountLibp2pPing()
     await net.publisher.start()
@@ -108,7 +109,7 @@ proc setupNetwork(
   # that changes, this will be needed to cause the publisher to have shard interest
   # for any shards the subscriber may want to use, which is required for waitForMesh to work.
   for i in 0 ..< numShards.int:
-    let shard = PubsubTopic("/waku/2/rs/1/" & $i)
+    let shard = PubsubTopic("/waku/2/rs/3/" & $i)
     net.publisher.subscribe((kind: PubsubSub, topic: shard), dummyHandler).expect(
       "Failed to sub publisher"
     )

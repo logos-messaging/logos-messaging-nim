@@ -24,19 +24,6 @@ proc createNode*(conf: WakuNodeConf): Future[Result[Waku, string]] {.async.} =
 
   return ok(wakuRes)
 
-# Deprecated: use WakuNodeConf overload instead
-proc createNode*(
-    config: NodeConfig
-): Future[Result[Waku, string]] {.async, deprecated: "Use WakuNodeConf overload".} =
-  let wakuConf = toWakuConf(config).valueOr:
-    return err("Failed to handle the configuration: " & error)
-
-  let wakuRes = (await Waku.new(wakuConf)).valueOr:
-    error "waku initialization failed", error = error
-    return err("Failed setting up Waku: " & $error)
-
-  return ok(wakuRes)
-
 proc checkApiAvailability(w: Waku): Result[void, string] =
   if w.isNil():
     return err("Waku node is not initialized")

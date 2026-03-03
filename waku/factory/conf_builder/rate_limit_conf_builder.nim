@@ -17,7 +17,7 @@ proc withRateLimits*(b: var RateLimitConfBuilder, rateLimits: seq[string]) =
 proc withRateLimitsIfNotAssigned*(
     b: var RateLimitConfBuilder, rateLimits: seq[string]
 ) =
-  if b.strValue.isNone():
+  if b.strValue.isNone() or b.strValue.get().len == 0:
     b.strValue = some(rateLimits)
 
 proc build*(b: RateLimitConfBuilder): Result[ProtocolRateLimitSettings, string] =

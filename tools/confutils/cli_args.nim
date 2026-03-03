@@ -1117,7 +1117,8 @@ proc toWakuConf*(n: WakuNodeConf): ConfResult[WakuConf] =
   b.webSocketConf.withKeyPath(n.websocketSecureKeyPath)
   b.webSocketConf.withCertPath(n.websocketSecureCertPath)
 
-  b.rateLimitConf.withRateLimits(n.rateLimits)
+  if n.rateLimits.len > 0:
+    b.rateLimitConf.withRateLimits(n.rateLimits)
 
   b.kademliaDiscoveryConf.withEnabled(n.enableKadDiscovery)
   b.kademliaDiscoveryConf.withBootstrapNodes(n.kadBootstrapNodes)

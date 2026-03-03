@@ -1,10 +1,11 @@
-import std/json
-import chronos, results, ffi
+import std/[json, strutils]
+import chronos, chronicles, results, confutils, confutils/std/net, ffi
 import
   waku/factory/waku,
   waku/node/waku_node,
-  waku/api/[api, api_conf, types],
+  waku/api/[api, types],
   waku/events/[message_events, health_events],
+  tools/confutils/cli_args,
   ../declare_lib,
   ../json_event
 
@@ -14,15 +15,32 @@ proc `%`*(id: RequestId): JsonNode =
 
 registerReqFFI(CreateNodeRequest, ctx: ptr FFIContext[Waku]):
   proc(configJson: cstring): Future[Result[string, string]] {.async.} =
-    ## Parse the JSON configuration and create a node
-    let nodeConfig =
-      try:
-        decodeNodeConfigFromJson($configJson)
-      except SerializationError as e:
-        return err("Failed to parse config JSON: " & e.msg)
+    ## Parse the JSON configuration using fieldPairs approach (WakuNodeConf)
+    var conf = defaultWakuNodeConf().valueOr:
+      return err("Failed creating default conf: " & error)
+
+    var jsonNode: JsonNode
+    try:
+      jsonNode = parseJson($configJson)
+    except Exception:
+      return err(
+        "Failed to parse config JSON: " & getCurrentExceptionMsg() &
+          " configJson string: " & $configJson
+      )
+
+    for confField, confValue in fieldPairs(conf):
+      if jsonNode.contains(confField):
+        let formattedString = ($jsonNode[confField]).strip(chars = {'\"'})
+        try:
+          confValue = parseCmdArg(typeof(confValue), formattedString)
+        except Exception:
+          return err(
+            "Failed to parse field '" & confField & "': " &
+              getCurrentExceptionMsg() & ". Value: " & formattedString
+          )
 
     # Create the node
-    ctx.myLib[] = (await api.createNode(nodeConfig)).valueOr:
+    ctx.myLib[] = (await api.createNode(conf)).valueOr:
       let errMsg = $error
       chronicles.error "CreateNodeRequest failed", err = errMsg
       return err(errMsg)

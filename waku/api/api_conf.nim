@@ -9,7 +9,7 @@ import
   waku/factory/waku_conf,
   waku/factory/conf_builder/conf_builder,
   waku/factory/networks_config,
-  ./entry_nodes
+  tools/confutils/entry_nodes
 
 export json_serialization, json_options
 

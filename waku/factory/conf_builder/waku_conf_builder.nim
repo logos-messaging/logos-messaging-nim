@@ -12,7 +12,8 @@ import
   ../networks_config,
   ../../common/logging,
   ../../common/utils/parse_size_units,
-  ../../waku_enr/capabilities
+  ../../waku_enr/capabilities,
+  tools/confutils/entry_nodes
 
 import
   ./filter_service_conf_builder,
@@ -407,6 +408,27 @@ proc applyNetworkConf(builder: var WakuConfBuilder) =
 
   if builder.p2pReliability.isNone:
     builder.withP2pReliability(networkConf.p2pReliability)
+
+  # Process entry nodes from network config - classify and distribute
+  if networkConf.entryNodes.len > 0:
+    let processed = processEntryNodes(networkConf.entryNodes)
+    if processed.isOk():
+      let (enrTreeUrls, bootstrapEnrs, staticNodesFromEntry) = processed.get()
+
+      # Set ENRTree URLs for DNS discovery
+      if enrTreeUrls.len > 0:
+        for url in enrTreeUrls:
+          builder.dnsDiscoveryConf.withEnrTreeUrl(url)
+
+      # Set ENR records as bootstrap nodes for discv5
+      if bootstrapEnrs.len > 0:
+        builder.discv5Conf.withBootstrapNodes(bootstrapEnrs)
+
+      # Add static nodes (multiaddrs and those extracted from ENR entries)
+      if staticNodesFromEntry.len > 0:
+        builder.withStaticNodes(staticNodesFromEntry)
+    else:
+      warn "Failed to process entry nodes from network conf", error = processed.error()
 
 proc build*(
     builder: var WakuConfBuilder, rng: ref HmacDrbgContext = crypto.newRng()

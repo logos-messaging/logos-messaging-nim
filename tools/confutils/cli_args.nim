@@ -30,7 +30,8 @@ import
     waku_core/message/default_values,
     waku_mix,
   ],
-  ../../tools/rln_keystore_generator/rln_keystore_generator
+  ../../tools/rln_keystore_generator/rln_keystore_generator,
+  ./entry_nodes
 
 import ./envvar as confEnvvarDefs, ./envvar_net as confEnvvarNet
 
@@ -304,6 +305,14 @@ hence would have reachability issues.""",
       defaultValue: false,
       name: "rln-relay-dynamic"
     .}: bool
+
+    entryNodes* {.
+      desc:
+        "Entry node address (enrtree:, enr:, or multiaddr). " &
+        "Automatically classified and distributed to DNS discovery, discv5 bootstrap, " &
+        "and static nodes. Argument may be repeated.",
+      name: "entry-node"
+    .}: seq[string]
 
     staticnodes* {.
       desc: "Peer multiaddr to directly connect with. Argument may be repeated.",
@@ -1000,6 +1009,26 @@ proc toWakuConf*(n: WakuNodeConf): ConfResult[WakuConf] =
   b.withRelayPeerExchange(n.relayPeerExchange)
   b.withRelayShardedPeerManagement(n.relayShardedPeerManagement)
   b.withStaticNodes(n.staticNodes)
+
+  # Process entry nodes - supports enrtree:, enr:, and multiaddress formats
+  if n.entryNodes.len > 0:
+    let (enrTreeUrls, bootstrapEnrs, staticNodesFromEntry) = processEntryNodes(
+      n.entryNodes
+    ).valueOr:
+      return err("Failed to process entry nodes: " & error)
+
+    # Set ENRTree URLs for DNS discovery
+    if enrTreeUrls.len > 0:
+      for url in enrTreeUrls:
+        b.dnsDiscoveryConf.withEnrTreeUrl(url)
+
+    # Set ENR records as bootstrap nodes for discv5
+    if bootstrapEnrs.len > 0:
+      b.discv5Conf.withBootstrapNodes(bootstrapEnrs)
+
+    # Add static nodes (multiaddrs and those extracted from ENR entries)
+    if staticNodesFromEntry.len > 0:
+      b.withStaticNodes(staticNodesFromEntry)
 
   if n.numShardsInNetwork != 0:
     b.withNumShardsInCluster(n.numShardsInNetwork)

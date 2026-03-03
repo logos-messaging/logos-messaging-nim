@@ -32,6 +32,7 @@ type NetworkConf* = object
   enableKadDiscovery*: bool
   kadBootstrapNodes*: seq[string]
   mix*: bool
+  p2pReliability*: bool
 
 # cluster-id=1 (aka The Waku Network)
 # Cluster configuration corresponding to The Waku Network. Note that it
@@ -51,6 +52,7 @@ proc TheWakuNetworkConf*(T: type NetworkConf): NetworkConf =
     enableKadDiscovery: false,
     kadBootstrapNodes: @[],
     mix: false,
+    p2pReliability: false,
     discv5Discovery: true,
     discv5BootstrapNodes:
       @[
@@ -85,6 +87,7 @@ proc LogosDevConf*(T: type NetworkConf): NetworkConf =
         "/dns4/delivery-02.ac-cn-hongkong-c.logos.dev.status.im/tcp/30303/p2p/16Uiu2HAkvwhGHKNry6LACrB8TmEFoCJKEX29XR5dDUzk3UT3UNSE",
       ],
     mix: true,
+    p2pReliability: true,
     discv5Discovery: true,
     discv5BootstrapNodes: @[],
   )

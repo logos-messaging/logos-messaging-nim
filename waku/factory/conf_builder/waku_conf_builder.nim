@@ -405,6 +405,9 @@ proc applyNetworkConf(builder: var WakuConfBuilder) =
     if builder.mix.isNone:
       builder.mix = some(networkConf.mix)
 
+  if builder.p2pReliability.isNone:
+    builder.withP2pReliability(networkConf.p2pReliability)
+
 proc build*(
     builder: var WakuConfBuilder, rng: ref HmacDrbgContext = crypto.newRng()
 ): Result[WakuConf, string] =

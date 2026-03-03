@@ -465,7 +465,7 @@ hence would have reachability issues.""",
       desc:
         """Adds an extra effort in the delivery/reception of messages by leveraging store-v3 requests.
 with the drawback of consuming some more bandwidth.""",
-      defaultValue: false,
+      defaultValue: true,
       name: "reliability"
     .}: bool
 

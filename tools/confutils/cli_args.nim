@@ -480,7 +480,9 @@ with the drawback of consuming some more bandwidth.""",
 
     ## REST HTTP config
     rest* {.
-      desc: "Enable Waku REST HTTP server: true|false", defaultValue: true, name: "rest"
+      desc: "Enable Waku REST HTTP server: true|false",
+      defaultValue: false,
+      name: "rest"
     .}: bool
 
     restAddress* {.

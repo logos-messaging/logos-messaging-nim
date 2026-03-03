@@ -1,5 +1,6 @@
 import std/[json, strutils]
 import waku/factory/waku_state_info
+import tools/confutils/[cli_args, config_option_meta]
 
 proc logosdelivery_get_available_node_info_ids(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
@@ -33,14 +34,36 @@ proc logosdelivery_get_available_configs(
     ctx: ptr FFIContext[Waku], callback: FFICallBack, userData: pointer
 ) {.ffi.} =
   ## Returns information about the accepted config items.
-  ## For analogy with a CLI app, this is the info when typing --help for a command.
   requireInitializedNode(ctx, "GetAvailableConfigs"):
     return err(errMsg)
 
-  ## TODO: we are now returning a simple default value for NodeConfig.
-  ## The NodeConfig struct is too complex and we need to have a flattened simpler config.
-  ## The expected returned value for this is a list of possible config items with their
-  ## description, accepted values, default value, etc.
+  let conf = defaultWakuNodeConf().valueOr:
+    return err("Failed to get default logos-discovery configuration")
 
-  let defaultConfig = NodeConfig.init()
-  return ok($(%*defaultConfig))
+  let optionMetas: seq[ConfigOptionMeta] = extractConfigOptionMeta(WakuNodeConf)
+  var configOptions: seq[string]
+  var configOptionDetails = newJArray()
+  var defaultConfig = newJObject()
+
+  for confField, confValue in fieldPairs(conf):
+    defaultConfig[confField] = %repr(confValue)
+
+  for meta in optionMetas:
+    configOptions.add(meta.fieldName)
+    configOptionDetails.add(
+      %*{
+        "name": meta.fieldName,
+        "type": meta.typeName,
+        "cliName": meta.cliName,
+        "desc": meta.desc,
+        "defaultValue": meta.defaultValue,
+        "command": meta.command,
+      }
+    )
+
+  var jsonNode = newJObject()
+  jsonNode["configOptions"] = %*configOptions
+  jsonNode["configOptionDetails"] = configOptionDetails
+  jsonNode["defaultConfig"] = defaultConfig
+  let asString = pretty(jsonNode)
+  return ok(asString)

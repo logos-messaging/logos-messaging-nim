@@ -165,7 +165,7 @@ type WakuNodeConf* = object
 
     preset* {.
       desc:
-        "Network preset to use. 'twn' is The RLN-protected Waku Network (cluster 1). 'logosdev' is the Logos Dev Network (cluster 2). Overrides other values.",
+        "Network preset to use. 'twn' is The RLN-protected Waku Network (cluster 1). 'logos.dev' is the Logos Dev Network (cluster 2). Overrides other values.",
       defaultValue: "",
       name: "preset"
     .}: string
@@ -1128,7 +1128,6 @@ proc toWakuConf*(n: WakuNodeConf): ConfResult[WakuConf] =
   of WakuMode.Core:
     b.withRelay(true)
     b.filterServiceConf.withEnabled(true)
-    b.filterServiceConf.withMaxPeersToServeIfNotAssigned(20)
     b.withLightPush(true)
     b.discv5Conf.withEnabled(true)
     b.withPeerExchange(true)

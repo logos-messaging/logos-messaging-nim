@@ -263,8 +263,7 @@ type WakuNodeConf* = object
 
     ## Circuit-relay config
     isRelayClient* {.
-      desc:
-        """Set the node as a relay-client.
+      desc: """Set the node as a relay-client.
 Set it to true for nodes that run behind a NAT or firewall and
 hence would have reachability issues.""",
       defaultValue: false,
@@ -329,7 +328,7 @@ hence would have reachability issues.""",
     numShardsInNetwork* {.
       desc:
         "Enables autosharding and set number of shards in the cluster, set to `0` to use static sharding",
-      defaultValue: 1,
+      defaultValue: 0,
       name: "num-shards-in-network"
     .}: uint16
 

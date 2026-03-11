@@ -1,7 +1,7 @@
 ---
-name: Prepare Full Release
+name: Prepare Release
 about: Execute tasks for the creation and publishing of a new full release
-title: 'Prepare full release 0.0.0'
+title: 'Prepare release 0.0.0'
 labels: full-release
 assignees: ''
 
@@ -58,7 +58,7 @@ All items below are to be completed by the owner of the given release.
 
 - [ ] **Proceed with release**
 
-  - [ ] Assign a final release tag (`v0.X.0`) to the same commit that contains the validated release-candidate tag (e.g. `v0.X.0`).
+  - [ ] Assign a final release tag (`v0.X.0`) to the same commit that contains the validated release-candidate tag (e.g. `git tag -as v0.X.0 -m "final release."`).
   - [ ] Update [logos-delivery-compose](https://github.com/logos-messaging/logos-delivery-compose) and [logos-delivery-simulator](https://github.com/logos-messaging/logos-delivery-simulator) according to the new release.
   - [ ] Bump logos-delivery dependency in [logos-delivery-rust-bindings](https://github.com/logos-messaging/logos-delivery-rust-bindings) and make sure all examples and tests work.
   - [ ] Bump logos-delivery dependency in [logos-delivery-go-bindings](https://github.com/logos-messaging/logos-delivery-go-bindings) and make sure all tests work.

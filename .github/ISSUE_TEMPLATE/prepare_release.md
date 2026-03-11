@@ -64,6 +64,7 @@ All items below are to be completed by the owner of the given release.
   - [ ] Bump logos-delivery dependency in [logos-delivery-go-bindings](https://github.com/logos-messaging/logos-delivery-go-bindings) and make sure all tests work.
   - [ ] Create GitHub release (https://github.com/logos-messaging/logos-delivery/releases).
   - [ ] Submit a PR to merge the release branch back to `master`. Make sure you use the option "Merge pull request (Create a merge commit)" to perform the merge. Ping repo admin if this option is not available.
+  - [ ] Submit a deployment PR with the recently created release.
 
 ### Links
 

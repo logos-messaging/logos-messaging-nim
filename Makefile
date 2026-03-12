@@ -28,9 +28,10 @@ GIT_SUBMODULE_UPDATE := git submodule update --init --recursive
 else # "variables.mk" was included. Business as usual until the end of this file.
 
 # Determine the OS
-detected_OS := $(shell uname -s)
-ifneq (,$(findstring MINGW,$(detected_OS)))
+ifeq ($(OS),Windows_NT)
   detected_OS := Windows
+else
+  detected_OS := $(strip $(shell uname -s))
 endif
 
 ifeq ($(detected_OS),Windows)
